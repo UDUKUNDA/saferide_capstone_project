@@ -198,3 +198,80 @@ class FindChatView(APIView):
             {'message': 'Chat not found'}, 
             status=status.HTTP_404_NOT_FOUND
         )
+import json
+
+class AddMessageView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        chat_id = request.data.get('chatId')
+        sender_id = request.data.get('senderId')
+        text = request.data.get('text')
+        sender_language = request.data.get('senderLanguage', 'en')
+        
+        if not all([chat_id, sender_id, text]):
+            return Response(
+                {'error': 'chatId, senderId, and text are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            chat = Chat.objects.get(id=chat_id)
+            sender = User.objects.get(id=sender_id)
+            
+            # Google Cloud Translation
+            try:
+                # Initialize translation client
+                # Note: You need to set GOOGLE_APPLICATION_CREDENTIALS environment variable
+                translate_client = translate.Client()
+                
+                # Translate text
+                if sender_language != 'en':
+                    result = translate_client.translate(
+                        text, 
+                        target_language=sender_language
+                    )
+                    translated_text = result['translatedText']
+                else:
+                    translated_text = text
+            except Exception as e:
+                print(f"Translation error: {e}")
+                translated_text = text  # Fallback to original text
+            
+            message = Message.objects.create(
+                chat=chat,
+                sender=sender,
+                text=translated_text
+            )
+            
+            return Response(MessageSerializer(message).data)
+            
+        except Chat.DoesNotExist:
+            return Response(
+                {'error': 'Chat not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GetMessagesView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, chat_id):
+        try:
+            messages = Message.objects.filter(chat_id=chat_id).order_by('created_at')
+            serializer = MessageSerializer(messages, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
