@@ -146,3 +146,55 @@ class DeleteUserView(generics.DestroyAPIView):
         self.perform_destroy(instance)
         return Response({'message': 'User deleted successfully'})
 
+class CreateChatView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        sender_id = request.data.get('senderId')
+        receiver_id = request.data.get('receiverId')
+        
+        if not sender_id or not receiver_id:
+            return Response(
+                {'error': 'senderId and receiverId are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if chat already exists
+        existing_chat = Chat.objects.filter(
+            members__contains=[sender_id, receiver_id]
+        ).first()
+        
+        if existing_chat:
+            return Response(ChatSerializer(existing_chat).data)
+        
+        chat = Chat.objects.create(members=[sender_id, receiver_id])
+        return Response(ChatSerializer(chat).data, status=status.HTTP_201_CREATED)
+
+class UserChatsView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, user_id):
+        chats = Chat.objects.filter(members__contains=[user_id])
+        serializer = ChatSerializer(chats, many=True)
+        return Response(serializer.data)
+
+class GetAllChatsView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChatSerializer
+    queryset = Chat.objects.all()
+
+class FindChatView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, first_id, second_id):
+        # Find chat where members contain both users
+        chat = Chat.objects.filter(
+            members__contains=[first_id, second_id]
+        ).first()
+        
+        if chat:
+            return Response(ChatSerializer(chat).data)
+        return Response(
+            {'message': 'Chat not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
