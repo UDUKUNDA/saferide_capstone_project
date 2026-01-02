@@ -275,3 +275,30 @@ class GetMessagesView(APIView):
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class CreateOrderView(generics.CreateAPIView):
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class GetAllOrdersView(generics.ListAPIView):
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Order.objects.all()
+
+class DeleteOrderView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Order.objects.all()
+    lookup_field = 'id'
+    
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({'message': 'Order deleted successfully'})
