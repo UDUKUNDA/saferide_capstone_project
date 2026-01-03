@@ -197,6 +197,11 @@ class FindChatView(APIView):
         )
 import json
 
+import logging
+import os
+
+logger = logging.getLogger(__name__)
+
 class AddMessageView(APIView):
     permission_classes = [IsAuthenticated]
     
@@ -217,23 +222,25 @@ class AddMessageView(APIView):
             sender = User.objects.get(id=sender_id)
             
             # Google Cloud Translation
+            translated_text = text
             try:
-                # Initialize translation client
-                # Note: You need to set GOOGLE_APPLICATION_CREDENTIALS environment variable
-                translate_client = translate.Client()
-                
-                # Translate text
-                if sender_language != 'en':
-                    result = translate_client.translate(
-                        text, 
-                        target_language=sender_language
-                    )
-                    translated_text = result['translatedText']
+                # Check for credentials
+                if 'GOOGLE_APPLICATION_CREDENTIALS' not in os.environ:
+                    logger.warning("GOOGLE_APPLICATION_CREDENTIALS not set. Skipping translation.")
                 else:
-                    translated_text = text
+                    # Initialize translation client
+                    translate_client = translate.Client()
+                    
+                    # Translate text
+                    if sender_language != 'en':
+                        result = translate_client.translate(
+                            text, 
+                            target_language=sender_language
+                        )
+                        translated_text = result['translatedText']
             except Exception as e:
-                print(f"Translation error: {e}")
-                translated_text = text  # Fallback to original text
+                logger.error(f"Translation error: {e}")
+                # Fallback to original text is already set
             
             message = Message.objects.create(
                 chat=chat,
