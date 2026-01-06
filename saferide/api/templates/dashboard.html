@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRide - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        /* Spinner for loading state */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-full">
+
+    <!-- Map Container -->
+    <div class="relative w-full h-full">
+        <!-- Google Map -->
+        <div id="google-map" class="w-full h-full"></div>
+
+        <!-- Order Ride Panel (Floating Overlay) -->
+        <div class="absolute top-4 left-4 bg-white p-6 rounded-lg shadow-2xl z-10 w-96 max-w-full">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Order a Ride</h2>
+            
+            <!-- Travel Mode Selection -->
+            <div class="flex space-x-4 mb-4">
+                <button id="mode-driving" onclick="setTravelMode('DRIVING')" class="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold transition">Car</button>
+                <button id="mode-bike" onclick="setTravelMode('TWO_WHEELER')" class="flex-1 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-semibold transition">Moto</button>
+            </div>
+
+            <form id="order-form" class="space-y-4" onsubmit="event.preventDefault(); handleDirections();">
+                <!-- Pickup Location -->
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium text-gray-600 mb-1">Pick-up Location</label>
+                    <input 
+                        type="text" 
+                        id="pickup-input" 
+                        placeholder="Current Location..." 
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        required
+                    >
+                </div>
+
+                <!-- Drop-off Location -->
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium text-gray-600 mb-1">Drop-off Location</label>
+                    <input 
+                        type="text" 
+                        id="dropoff-input" 
+                        placeholder="Enter drop-off location" 
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        required
+                    >
+                </div>
+
+                <!-- Ride Stats (Hidden initially) -->
+                <div id="ride-stats" class="hidden bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <div class="flex justify-between text-sm text-blue-800">
+                        <span>Distance: <b id="distance-text"></b></span>
+                        <span>Duration: <b id="duration-text"></b></span>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="error-message" class="hidden text-red-600 text-sm mt-2"></div>
+
+                <!-- Order Button -->
+                <button 
+                    type="submit" 
+                    id="order-btn"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition duration-200 shadow-md flex justify-center items-center"
+                >
+                    <span id="btn-text">Find Ride</span>
+                    <div id="btn-loader" class="loader hidden ml-2"></div>
+                </button>
+            </form>
+
+             <!-- Driver Status -->
+             <div class="mt-6 border-t pt-4">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">Nearby Drivers</h3>
+                <div class="space-y-2 max-h-40 overflow-y-auto" id="drivers-list">
+                    <p class="text-gray-500 text-sm">Searching for drivers...</p>
+                </div>
+            </div>
+             
+             <div class="mt-4 text-center">
+                 <a href="/" class="text-sm text-gray-500 hover:text-gray-700">Back to Home</a>
+             </div>
+        </div>
+    </div>
+
+    <!-- Popups -->
+    <!-- Busy Popup -->
+    <div id="busy-popup" class="hidden fixed top-10 right-10 bg-red-500 text-white px-6 py-4 rounded shadow-lg z-50 animate-bounce">
+        No drivers available nearby!
+    </div>
+
+    <!-- Success Popup -->
+    <div id="success-popup" class="hidden fixed top-10 right-10 bg-green-500 text-white px-6 py-4 rounded shadow-lg z-50">
+        Ride Ordered Successfully! Redirecting...
+    </div>
+
+    <!-- Google Maps API Script -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDHWREpVjjj9oC19N63SpZ6HnGSZzlpx9k&libraries=places&callback=initMap" async defer></script>
+
+    <script>
+        // --- State Variables ---
+        let map;
+        let directionsService;
+        let directionsRenderer;
+        let pickupAutocomplete;
+        let dropoffAutocomplete;
+        let geocoder;
+        
+        let currentLocation = null; // { lat, lng }
+        let currentAddress = '';
+        let travelMode = 'DRIVING'; // 'DRIVING' or 'TWO_WHEELER'
+        let mapusers = []; // Mock data for now
+        let currentUser = { 
+            _id: "{{ user.id|default:'guest_id' }}", 
+            username: "{{ user.username|default:'Guest' }}" 
+        }; 
+        
+        // Mock Socket
+        const socket = {
+            emit: (event, data) => console.log(`[Socket] Emitting '${event}':`, data)
+        };
+
+        // Mock Drivers Data (simulating mapusers from useChat)
+        const mockDrivers = [
+            { _id: 'd1', username: 'Jean Claude', roleKey: 'cabRider', latitude: -1.9441, longitude: 30.0619, car: "Toyota Corolla" },
+            { _id: 'd2', username: 'Marie Claire', roleKey: 'cabRider', latitude: -1.9500, longitude: 30.0580, car: "Rav4" },
+            { _id: 'd3', username: 'Emmanuel', roleKey: 'motorcyclist', latitude: -1.9350, longitude: 30.0800, car: "Moto 123" }
+        ];
+
+        // --- Initialization ---
+        function initMap() {
+            // Default: Kigali
+            const kigali = { lat: -1.9441, lng: 30.0619 };
+
+            map = new google.maps.Map(document.getElementById("google-map"), {
+                center: kigali,
+                zoom: 13,
+                mapTypeControl: false,
+                fullscreenControl: false,
+                streetViewControl: false
+            });
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer();
+            directionsRenderer.setMap(map);
+            geocoder = new google.maps.Geocoder();
+
+            initAutocomplete();
+            
+            // Start Geolocation logic
+            getCurrentLocation();
+
+            // Simulate fetching users
+            mapusers = mockDrivers;
+            updateDriversOnMap();
+            renderDriversList();
+        }
+
+        function initAutocomplete() {
+            const options = {
+                componentRestrictions: { country: "rw" },
+                fields: ["address_components", "geometry", "icon", "name", "formatted_address"],
+                strictBounds: false,
+            };
+
+            pickupAutocomplete = new google.maps.places.Autocomplete(document.getElementById("pickup-input"), options);
+            dropoffAutocomplete = new google.maps.places.Autocomplete(document.getElementById("dropoff-input"), options);
+        }
+
+        // --- Geolocation Logic ---
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        currentLocation = { lat: latitude, lng: longitude };
+                        
+                        // Pan map
+                        map.panTo(currentLocation);
+                        map.setZoom(15);
+
+                        // Reverse Geocode
+                        getFormattedAddress(currentLocation);
+
+                        // Add marker for current location
+                        new google.maps.Marker({
+                            position: currentLocation,
+                            map: map,
+                            title: "You are here",
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 8,
+                                fillColor: "#4285F4",
+                                fillOpacity: 1,
+                                strokeColor: "white",
+                                strokeWeight: 2,
+                            },
+                        });
+                    },
+                    (error) => {
+                        console.error('Geolocation failed:', error);
+                        // Fallback to Kigali center
+                        currentLocation = { lat: -1.970579, lng: 30.104429 };
+                        map.panTo(currentLocation);
+                    }
+                );
+            } else {
+                console.error("Browser doesn't support geolocation");
+            }
+        }
+
+        function getFormattedAddress(location) {
+            geocoder.geocode({ location }, (results, status) => {
+                if (status === 'OK') {
+                    if (results[0]) {
+                        currentAddress = results[0].formatted_address;
+                        // Auto-fill pickup if empty
+                        const pickupInput = document.getElementById("pickup-input");
+                        if (!pickupInput.value) {
+                            pickupInput.value = currentAddress;
+                        }
+                    } else {
+                        console.error('No results found');
+                    }
+                } else {
+                    console.error('Geocoder failed due to:', status);
+                }
+            });
+        }
+
+        // --- Driver Logic ---
+        function setTravelMode(mode) {
+            travelMode = mode;
+            // Update UI buttons
+            const driveBtn = document.getElementById('mode-driving');
+            const bikeBtn = document.getElementById('mode-bike');
+            
+            if (mode === 'DRIVING') {
+                driveBtn.classList.replace('bg-gray-200', 'bg-blue-600');
+                driveBtn.classList.replace('text-gray-700', 'text-white');
+                bikeBtn.classList.replace('bg-blue-600', 'bg-gray-200');
+                bikeBtn.classList.replace('text-white', 'text-gray-700');
+            } else {
+                bikeBtn.classList.replace('bg-gray-200', 'bg-blue-600');
+                bikeBtn.classList.replace('text-gray-700', 'text-white');
+                driveBtn.classList.replace('bg-blue-600', 'bg-gray-200');
+                driveBtn.classList.replace('text-white', 'text-gray-700');
+            }
+
+            // Refresh drivers list based on mode
+            renderDriversList();
+        }
+
+        function findNearestUser() {
+            if (currentLocation && mapusers.length > 0) {
+                const filteredUsers = mapusers.filter(user => {
+                    if (travelMode === 'DRIVING') {
+                        return user.roleKey === 'cabRider';
+                    } else if (travelMode === 'TWO_WHEELER') {
+                        return user.roleKey === 'motorcyclist';
+                    }
+                    return false;
+                });
+
+                if (filteredUsers.length === 0) {
+                    showBusyPopup();
+                    return null;
+                }
+
+                let nearestUser = null;
+                let minDistance = Infinity;
+
+                filteredUsers.forEach(user => {
+                    const distanceToUser = Math.sqrt(
+                        Math.pow(user.latitude - currentLocation.lat, 2) + 
+                        Math.pow(user.longitude - currentLocation.lng, 2)
+                    );
+
+                    if (distanceToUser < minDistance) {
+                        minDistance = distanceToUser;
+                        nearestUser = user;
+                    }
+                });
+
+                return nearestUser;
+            } else {
+                showBusyPopup();
+                return null;
+            }
+        }
+
+        function showBusyPopup() {
+            const popup = document.getElementById('busy-popup');
+            popup.classList.remove('hidden');
+            setTimeout(() => {
+                popup.classList.add('hidden');
+            }, 5000);
+        }
+
+        // --- Order Logic ---
+        function handleDirections() {
+            const originVal = document.getElementById("pickup-input").value;
+            const destinationVal = document.getElementById("dropoff-input").value;
+            const errorDiv = document.getElementById("error-message");
+            const btnLoader = document.getElementById("btn-loader");
+            const btnText = document.getElementById("btn-text");
+
+            if (!originVal || !destinationVal) {
+                errorDiv.innerText = "Please fill in both locations.";
+                errorDiv.classList.remove("hidden");
+                return;
+            }
+            errorDiv.classList.add("hidden");
+            
+            // Show loading
+            btnLoader.classList.remove("hidden");
+            btnText.innerText = "Calculating...";
+
+            // 1. Calculate Route
+            const request = {
+                origin: originVal,
+                destination: destinationVal,
+                travelMode: google.maps.TravelMode.DRIVING, // Google Maps mode (always DRIVING for visualization usually)
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    directionsRenderer.setDirections(result);
+                    
+                    const route = result.routes[0].legs[0];
+                    document.getElementById("distance-text").innerText = route.distance.text;
+                    document.getElementById("duration-text").innerText = route.duration.text;
+                    document.getElementById("ride-stats").classList.remove("hidden");
+
+                    // 2. Create Order Logic
+                    createOrderIfPossible(originVal, destinationVal);
+                    
+                } else {
+                    errorDiv.innerText = "Directions request failed: " + status;
+                    errorDiv.classList.remove("hidden");
+                    btnLoader.classList.add("hidden");
+                    btnText.innerText = "Find Ride";
+                }
+            });
+        }
+
+        async function createOrderIfPossible(origin, destination) {
+            const btnLoader = document.getElementById("btn-loader");
+            const btnText = document.getElementById("btn-text");
+
+            if (currentUser && currentLocation) {
+                const nearestUser = findNearestUser();
+
+                if (nearestUser) {
+                    const orderData = {
+                        senderId: currentUser._id,
+                        senderName: currentUser.username,
+                        origin,
+                        destination,
+                        receiverId: nearestUser._id,
+                        receiverName: nearestUser.username
+                    };
+
+                    try {
+                        // Mocking API Call
+                        console.log("Creating order with data:", orderData);
+                        await mockCreateOrderApi(orderData);
+                        
+                        socket.emit("sendOrder", orderData);
+                        
+                        // Success UI
+                        const successPopup = document.getElementById('success-popup');
+                        successPopup.classList.remove('hidden');
+                        
+                        setTimeout(() => {
+                            successPopup.classList.add('hidden');
+                            // navigate('/chat') equivalent
+                            window.location.href = "/dashboard"; // Or chat page if it existed
+                        }, 3000);
+
+                    } catch (error) {
+                        console.error('Error creating order:', error);
+                        document.getElementById("error-message").innerText = "Failed to create order.";
+                        document.getElementById("error-message").classList.remove("hidden");
+                    }
+                } else {
+                    console.error('No nearest user found');
+                }
+            }
+            
+            // Reset button
+            btnLoader.classList.add("hidden");
+            btnText.innerText = "Find Ride";
+        }
+
+        // Mock API function
+        function mockCreateOrderApi(data) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve({ success: true, message: "Order created", data });
+                }, 1000);
+            });
+        }
+
+        // --- Map Visualization Helpers ---
+        function updateDriversOnMap() {
+            const infoWindow = new google.maps.InfoWindow();
+
+            mapusers.forEach(driver => {
+                const marker = new google.maps.Marker({
+                    position: { lat: driver.latitude, lng: driver.longitude },
+                    map: map,
+                    title: driver.username,
+                    icon: {
+                        url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                    }
+                });
+
+                marker.addListener("click", () => {
+                    const content = `
+                        <div class="p-2">
+                            <h3 class="font-bold text-gray-800">${driver.username}</h3>
+                            <p class="text-sm text-gray-600">${driver.roleKey}</p>
+                        </div>
+                    `;
+                    infoWindow.setContent(content);
+                    infoWindow.open(map, marker);
+                });
+            });
+        }
+
+        function renderDriversList() {
+            const listContainer = document.getElementById("drivers-list");
+            listContainer.innerHTML = "";
+
+            const filtered = mapusers.filter(user => {
+                if (travelMode === 'DRIVING') return user.roleKey === 'cabRider';
+                if (travelMode === 'TWO_WHEELER') return user.roleKey === 'motorcyclist';
+                return false;
+            });
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = '<p class="text-gray-500 text-sm">No drivers found for this mode.</p>';
+                return;
+            }
+
+            filtered.forEach(driver => {
+                const item = document.createElement("div");
+                item.className = "flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100 transition cursor-pointer";
+                item.innerHTML = `
+                    <div>
+                        <p class="font-medium text-gray-800 text-sm">${driver.username}</p>
+                        <p class="text-xs text-gray-500">${driver.car || 'Vehicle'}</p>
+                    </div>
+                    <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">${driver.roleKey}</span>
+                `;
+                item.onclick = () => {
+                    map.panTo({ lat: driver.latitude, lng: driver.longitude });
+                    map.setZoom(16);
+                };
+                listContainer.appendChild(item);
+            });
+        }
+    </script>
+</body>
+</html>

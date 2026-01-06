@@ -2,7 +2,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from .models import User, Chat, Message, Order
 from .serializers import (
     UserSerializer, UserRegisterSerializer, UserLoginSerializer,
@@ -202,6 +202,34 @@ import os
 
 logger = logging.getLogger(__name__)
 
+def landing(request):
+    content = {
+        "Kigali": {
+            "title": "Kigali City",
+            "description": "SafeRide helps you travel across Kigali with confidence and comfort.",
+            "avgDistance": "12 km",
+            "travelTime": "25 min"
+        },
+        "Huye": {
+            "title": "Huye District",
+            "description": "Explore Huye with reliable rides and friendly drivers.",
+            "avgDistance": "20 km",
+            "travelTime": "40 min"
+        },
+        "Musanze": {
+            "title": "Musanze Volcano Region",
+            "description": "Reach the scenic north safely and on time.",
+            "avgDistance": "35 km",
+            "travelTime": "70 min"
+        }
+    }
+    return render(request, "landing.html", {"content": content})
+
+def login_page(request):
+    return render(request, "login.html")
+
+def dashboard_page(request):
+    return render(request, "dashboard.html")
 class AddMessageView(APIView):
     permission_classes = [IsAuthenticated]
     

@@ -1,0 +1,73 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeRide - Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900">
+  <div class="grid w-full h-screen grid-cols-1 sm:grid-cols-2">
+    <div class="hidden sm:block">
+      <img class="object-cover w-full h-full" src="{% static 'img/dash.jpg' %}" alt="Motorcycle" onerror="this.style.display='none'"/>
+    </div>
+    <div class="flex flex-col justify-center">
+      <form id="login-form" class="max-w-[400px] w-full mx-auto bg-white p-4 rounded-2xl shadow-md">
+        <h2 class="py-6 text-4xl font-bold text-center text-indigo-500">SafeRide</h2>
+        <p id="error" class="text-red-600 hidden"></p>
+        <div class="flex flex-col py-2">
+          <label for="email">Email</label>
+          <input class="p-2 border rounded-lg" type="text" id="email" />
+        </div>
+        <div class="flex flex-col py-2">
+          <label for="password">Password</label>
+          <input class="p-2 border rounded-lg" type="password" id="password" />
+        </div>
+        <button class="w-full my-5 text-white bg-indigo-600 border rounded-lg hover:bg-indigo-500">Sign In</button>
+        <div class="flex justify-center gap-2">
+          <p>Create an account?</p>
+          <a class="text-indigo-600 hover:underline" href="/register">Sign Up</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const errorEl = document.getElementById('error');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      try {
+        const res = await fetch('/api/login/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.detail || data?.message || 'An error occurred');
+        }
+        if (data && data.data) {
+          const { token, user } = data.data;
+          localStorage.setItem('token', token);
+          localStorage.setItem('userData', JSON.stringify(user));
+          sessionStorage.setItem('justLoggedIn', 'true');
+          alert(data.message || 'Login successful');
+          window.location.href = '/dashboard';
+        } else {
+          throw new Error('Invalid response format from server');
+        }
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
+
