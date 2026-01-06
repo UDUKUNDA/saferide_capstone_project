@@ -236,6 +236,9 @@ def register_page(request):
 
 def orders_page(request):
     return render(request, "orders.html")
+
+def settings_page(request):
+    return render(request, "settings.html")
 class AddMessageView(APIView):
     permission_classes = [IsAuthenticated]
     

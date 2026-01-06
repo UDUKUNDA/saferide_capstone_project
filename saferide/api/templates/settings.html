@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRide - Settings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        // Check for saved theme preference
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="bg-gray-100 h-full flex flex-col md:flex-row overflow-hidden dark:bg-gray-900">
+
+    <!-- Include Sidebar -->
+    {% include "components/sidebar.html" %}
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col md:ml-64 transition-all duration-300 h-full overflow-y-auto">
+        
+        <!-- Include Navbar -->
+        {% include "components/navbar.html" %}
+
+        <!-- Settings Content -->
+        <main class="flex-1 p-4 sm:px-6 lg:px-8 bg-gray-100 dark:bg-gray-900 min-h-screen">
+            <div class="max-w-3xl p-4 mx-auto my-4 text-white bg-gray-800 rounded-lg shadow-lg">
+                <h2 class="mb-6 text-2xl font-bold">Settings</h2>
+                
+                <form id="settings-form" class="space-y-4">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">Username</label>
+                            <input 
+                                type="text" 
+                                id="username"
+                                name="username" 
+                                value="{{ user.username }}"
+                                class="w-full p-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white" 
+                            />
+                        </div>
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">Email</label>
+                            <input 
+                                type="email" 
+                                id="email"
+                                name="email" 
+                                value="{{ user.email }}"
+                                class="w-full p-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white" 
+                            />
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">Phone Number</label>
+                            <input 
+                                type="text" 
+                                id="phone"
+                                name="phone" 
+                                value="{{ user.phone|default:'' }}"
+                                class="w-full p-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white" 
+                            />
+                        </div>
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">City</label>
+                            <select 
+                                id="city"
+                                name="city" 
+                                class="w-full p-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                            >
+                                <option value="">--------------select a city------------------</option>
+                                <option value="Kigali">Kigali</option>
+                                <option value="Huye">Huye</option>
+                                <option value="Musanze">Musanze</option>
+                                <option value="Muhanga">Muhanga</option>
+                                <option value="Nyamata">Nyamata</option>
+                                <option value="Rubavu">Rubavu</option>
+                                <option value="Rusizi">Rusizi</option>
+                                <option value="Gicumbi">Gicumbi</option>
+                                <option value="Nyagatare">Nyagatare</option>
+                                <option value="Rwamagana">Rwamagana</option>
+                                <option value="Kayonza">Kayonza</option>
+                                <option value="Nyanza">Nyanza</option>
+                                <option value="Ngoma">Ngoma</option>
+                                <option value="Karongi">Karongi</option>
+                                <option value="Bugesera">Bugesera</option>
+                                <option value="Gakenke">Gakenke</option>
+                                <option value="Kamonyi">Kamonyi</option>
+                                <option value="Nyabihu">Nyabihu</option>
+                                <option value="Rulindo">Rulindo</option>
+                                <option value="Burera">Burera</option>
+                                <option value="Ngororero">Ngororero</option>
+                                <option value="Nyaruguru">Nyaruguru</option>
+                                <option value="Ruhango">Ruhango</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block mb-2 text-sm font-medium">Password</label>
+                            <input 
+                                type="password" 
+                                id="password"
+                                name="password" 
+                                placeholder="Enter new password to update"
+                                class="w-full p-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white" 
+                            />
+                        </div>
+                    </div>
+                    
+                    <button 
+                        type="submit" 
+                        class="w-full p-2 mt-4 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition"
+                    >
+                        Update Details
+                    </button>
+                </form>
+
+                <!-- Admin contact information -->
+                <div class="p-4 mt-8 bg-gray-700 rounded-md">
+                    <h3 class="mb-2 text-xl font-semibold text-blue-500">Contact Admin</h3>
+                    <p class="text-sm text-gray-300">
+                        If you have any complaints or need further assistance, please contact our customer support:
+                    </p>
+                    <p class="mt-2 text-sm text-gray-300">
+                        Email: <a href="mailto:saferide@support.com" class="text-blue-400 underline">saferide@support.com</a>
+                    </p>
+                    <p class="mt-2 text-sm text-gray-300">
+                        Phone: <a href="tel:+250780704718" class="text-blue-400 underline">+250 780 704 718</a>
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize city selection
+        const userCity = "{{ user.city }}";
+        if (userCity) {
+            const citySelect = document.getElementById('city');
+            for(let i=0; i < citySelect.options.length; i++) {
+                if(citySelect.options[i].value === userCity) {
+                    citySelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        document.getElementById('settings-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userId = "{{ user.id }}";
+            const token = localStorage.getItem('token');
+            
+            if (!userId || userId === 'None') {
+                alert("User session not found. Please login.");
+                return;
+            }
+
+            const formData = {
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                city: document.getElementById('city').value,
+            };
+
+            const password = document.getElementById('password').value;
+            
+            try {
+                // 1. Update Profile Details
+                const updateResponse = await fetch(`/api/users/${userId}/update/`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!updateResponse.ok) {
+                    const err = await updateResponse.json();
+                    throw new Error(err.message || "Failed to update profile");
+                }
+
+                let message = "Profile updated successfully!";
+
+                // 2. Update Password if provided
+                if (password) {
+                    const passResponse = await fetch(`/api/users/${userId}/password/`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ newPassword: password })
+                    });
+
+                    if (!passResponse.ok) {
+                        const err = await passResponse.json();
+                        throw new Error(err.message || "Failed to update password");
+                    }
+                    message += " Password updated.";
+                }
+
+                alert(message);
+                
+                // Optional: Update local storage user data if needed
+                // localStorage.setItem('userData', JSON.stringify({...}));
+
+            } catch (error) {
+                console.error("Error updating settings:", error);
+                alert(error.message);
+            }
+        });
+    </script>
+</body>
+</html>

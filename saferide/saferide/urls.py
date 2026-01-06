@@ -17,7 +17,7 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from api.views import landing, login_page, dashboard_page, register_page, orders_page
+from api.views import landing, login_page, dashboard_page, register_page, orders_page, settings_page
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -26,5 +26,6 @@ urlpatterns = [
     path("register/", register_page, name="register"),
     path("dashboard/", dashboard_page, name="dashboard"),
     path("orders/", orders_page, name="orders"),
+    path("settings/", settings_page, name="settings"),
     path("api/", include("api.urls")),
 ]
