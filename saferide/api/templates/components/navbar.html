@@ -1,14 +1,45 @@
 <!-- Navbar Component -->
-<div class="flex items-center justify-between p-4 text-gray-900 bg-gray-100 border-b border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+<!-- Moment.js for date formatting -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+
+<div class="flex items-center justify-between p-4 text-gray-900 bg-gray-100 border-b border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white relative">
     <h1 class="text-2xl font-extrabold text-blue-600 dark:text-blue-400">
         WELCOME {{ user.username|default:"Guest" }}
     </h1>
 
     <div class="flex items-center space-x-4">
-        <!-- Notification Icon (Mock) -->
-        <div class="relative cursor-pointer hover:text-blue-600">
-            <i class="fas fa-bell text-xl"></i>
-            <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">2</span>
+        <!-- Notification Component -->
+        <div class="relative">
+            <button id="notification-btn" class="relative p-2 text-2xl transition-transform transform focus:outline-none hover:scale-110 hover:text-blue-600">
+                <i class="fas fa-bell"></i>
+                <!-- Badge -->
+                <span id="notification-badge" class="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full hidden">
+                    0
+                </span>
+            </button>
+
+            <!-- Notification Dropdown -->
+            <div id="notification-dropdown" class="absolute right-0 top-12 z-50 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl hidden dark:bg-gray-800 dark:border-gray-700">
+                <div class="p-4">
+                    <div class="flex items-center justify-between pb-2 border-b border-gray-300 dark:border-gray-600">
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                            Notifications
+                        </h3>
+                        <button id="close-notifications" class="text-sm font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="notification-list" class="py-2 overflow-y-auto max-h-60 custom-scrollbar space-y-2">
+                        <!-- Items injected here -->
+                        <div class="text-center py-4 text-gray-500 text-sm">No new notifications</div>
+                    </div>
+
+                    <button id="mark-all-read" class="w-full mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline text-center">
+                        Mark all as read
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Theme Toggle Button -->
@@ -19,7 +50,94 @@
 </div>
 
 <script>
-    // Theme Toggle Logic
+    // --- Notification Logic ---
+    const notifBtn = document.getElementById('notification-btn');
+    const notifDropdown = document.getElementById('notification-dropdown');
+    const closeNotifBtn = document.getElementById('close-notifications');
+    const notifBadge = document.getElementById('notification-badge');
+    const notifList = document.getElementById('notification-list');
+    const markAllReadBtn = document.getElementById('mark-all-read');
+
+    // Mock Notifications Data (Replace with API/Socket data)
+    let notifications = [
+        { id: 1, senderName: 'Jean Claude', text: 'Hello, are you available?', date: new Date(Date.now() - 1000 * 60 * 5), isRead: false },
+        { id: 2, senderName: 'System', text: 'Welcome to SafeRide!', date: new Date(Date.now() - 1000 * 60 * 60 * 24), isRead: true }
+    ];
+
+    function renderNotifications() {
+        const unreadCount = notifications.filter(n => !n.isRead).length;
+        
+        // Update Badge
+        if (unreadCount > 0) {
+            notifBadge.innerText = unreadCount;
+            notifBadge.classList.remove('hidden');
+        } else {
+            notifBadge.classList.add('hidden');
+        }
+
+        // Update List
+        notifList.innerHTML = '';
+        if (notifications.length === 0) {
+            notifList.innerHTML = '<div class="text-center py-4 text-gray-500 text-sm">No new notifications</div>';
+            return;
+        }
+
+        notifications.forEach(n => {
+            const item = document.createElement('div');
+            item.className = `flex items-center p-3 text-sm rounded-lg cursor-pointer transition ${
+                n.isRead 
+                ? 'bg-gray-50 text-gray-600 dark:bg-gray-700 dark:text-gray-300' 
+                : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200'
+            } hover:bg-gray-100 dark:hover:bg-gray-600`;
+            
+            item.innerHTML = `
+                <div class="flex-1">
+                    <p class="font-semibold">New message from ${n.senderName}</p>
+                    <p class="text-xs opacity-75">${moment(n.date).fromNow()}</p>
+                </div>
+                ${!n.isRead ? '<span class="w-2 h-2 bg-blue-500 rounded-full ml-2"></span>' : ''}
+            `;
+            
+            item.onclick = () => markAsRead(n.id);
+            notifList.appendChild(item);
+        });
+    }
+
+    function markAsRead(id) {
+        notifications = notifications.map(n => n.id === id ? { ...n, isRead: true } : n);
+        renderNotifications();
+        // Here you would also call API to update status
+    }
+
+    markAllReadBtn.onclick = () => {
+        notifications = notifications.map(n => ({ ...n, isRead: true }));
+        renderNotifications();
+        // API call to mark all read
+    };
+
+    // Toggle Dropdown
+    notifBtn.onclick = (e) => {
+        e.stopPropagation();
+        notifDropdown.classList.toggle('hidden');
+    };
+
+    closeNotifBtn.onclick = (e) => {
+        e.stopPropagation();
+        notifDropdown.classList.add('hidden');
+    };
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!notifBtn.contains(e.target) && !notifDropdown.contains(e.target)) {
+            notifDropdown.classList.add('hidden');
+        }
+    });
+
+    // Initial Render
+    renderNotifications();
+
+
+    // --- Theme Toggle Logic ---
     const themeToggleBtn = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-icon');
     const htmlElement = document.documentElement;
