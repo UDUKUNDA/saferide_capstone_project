@@ -233,6 +233,9 @@ def dashboard_page(request):
 
 def register_page(request):
     return render(request, "register.html")
+
+def orders_page(request):
+    return render(request, "orders.html")
 class AddMessageView(APIView):
     permission_classes = [IsAuthenticated]
     

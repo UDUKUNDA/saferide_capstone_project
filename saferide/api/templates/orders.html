@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRide - Orders</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        // Check for saved theme preference
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="bg-gray-100 h-full flex flex-col md:flex-row overflow-hidden dark:bg-gray-900">
+
+    <!-- Include Sidebar -->
+    {% include "components/sidebar.html" %}
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col md:ml-64 transition-all duration-300 h-full overflow-y-auto">
+        
+        <!-- Include Navbar -->
+        {% include "components/navbar.html" %}
+
+        <!-- Orders Content -->
+        <main class="flex-1 p-4 sm:px-6 lg:px-8 bg-gray-900 min-h-screen">
+            <h2 class="mb-4 text-2xl font-semibold text-center text-gray-100">My Orders</h2>
+            
+            <div id="loading-indicator" class="text-center text-gray-400 mt-8">Loading orders...</div>
+            
+            <div id="orders-container" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 hidden">
+                <!-- Orders will be injected here via JavaScript -->
+            </div>
+            
+            <div id="no-orders-msg" class="hidden mt-8 text-center text-gray-400">No orders available.</div>
+        </main>
+    </div>
+
+    <script>
+        // Use user ID from template or fallback to guest for testing
+        const currentUserId = "{{ user.id|default:'guest_id' }}";
+        const userRole = "{{ user.roleKey|default:'client' }}"; 
+
+        async function fetchOrders() {
+            try {
+                // In a real app, you would fetch from /api/orders/all/ or similar
+                // For now, we'll simulate or use the API if available
+                const response = await fetch('/api/orders/all/', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}` // Assuming token auth
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch orders');
+                }
+
+                const allOrders = await response.json();
+                
+                // Filter logic from React:
+                // isClient ? myOrders.filter(senderId === user.id) : myOrders.filter(receiverId === user.id)
+                // Also check deletedOrders from localStorage
+                
+                const deletedOrders = JSON.parse(localStorage.getItem(`deletedOrders_${currentUserId}`) || '[]');
+                
+                const filteredOrders = allOrders.filter(order => {
+                    // Check if deleted
+                    if (deletedOrders.includes(order.id)) return false;
+
+                    // Role based filtering
+                    // Note: Ensure API returns 'sender' (ID) or 'senderId' consistent with React logic
+                    // The Django model has 'sender' and 'receiver' as ForeignKeys (IDs), and 'senderName', 'receiverName'
+                    
+                    if (userRole === 'client' || userRole === 'guest_id') { // Assuming default is client-like
+                        return order.sender === currentUserId; 
+                    } else {
+                        return order.receiver === currentUserId;
+                    }
+                });
+
+                renderOrders(filteredOrders);
+
+            } catch (error) {
+                console.error("Error fetching orders:", error);
+                document.getElementById('loading-indicator').innerText = "Failed to load orders.";
+                // Fallback for demo if API fails/no auth
+                renderOrders([]); 
+            }
+        }
+
+        function renderOrders(orders) {
+            const container = document.getElementById('orders-container');
+            const noOrdersMsg = document.getElementById('no-orders-msg');
+            const loader = document.getElementById('loading-indicator');
+
+            loader.classList.add('hidden');
+
+            if (orders.length === 0) {
+                noOrdersMsg.classList.remove('hidden');
+                container.classList.add('hidden');
+                return;
+            }
+
+            noOrdersMsg.classList.add('hidden');
+            container.classList.remove('hidden');
+            container.innerHTML = '';
+
+            orders.forEach(order => {
+                const card = document.createElement('div');
+                card.className = "p-4 bg-gray-800 rounded shadow-lg transition hover:bg-gray-750";
+                
+                card.innerHTML = `
+                    <p class="text-sm text-gray-300"><span class="font-bold">Customer:</span> ${order.senderName}</p>
+                    <p class="text-sm text-gray-300"><span class="font-bold">Pickup:</span> ${order.origin}</p>
+                    <p class="text-sm text-gray-300"><span class="font-bold">Destination:</span> ${order.destination}</p>
+                    <p class="text-sm text-gray-300"><span class="font-bold">Rider:</span> ${order.receiverName || 'Pending'}</p>
+                    <button 
+                        onclick="handleDelete('${order.id}')" 
+                        class="mt-2 text-red-500 hover:underline hover:text-red-400 transition"
+                    >
+                        Delete
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function handleDelete(orderId) {
+            if(confirm("Delete this order from your view?")) {
+                const deletedOrders = JSON.parse(localStorage.getItem(`deletedOrders_${currentUserId}`) || '[]');
+                deletedOrders.push(orderId);
+                localStorage.setItem(`deletedOrders_${currentUserId}`, JSON.stringify(deletedOrders));
+                
+                // Re-fetch to update view (or just remove element for performance)
+                fetchOrders(); 
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', fetchOrders);
+    </script>
+</body>
+</html>
