@@ -1,0 +1,121 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeRide - Register</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900">
+  <div class="grid w-full h-screen grid-cols-1 sm:grid-cols-2">
+    <div class="hidden sm:block">
+      <img class="object-cover w-full h-full" src="{% static 'img/dash.jpg' %}" alt="" onerror="this.style.display='none'"/>
+    </div>
+    <div class="flex flex-col justify-center">
+      <form id="register-form" class="max-w-[400px] w-full mx-auto bg-white p-4 rounded-2xl">
+        <h2 class="py-6 text-4xl font-bold text-center text-indigo-600">SafeRide</h2>
+        <p id="error" class="text-red-600 hidden"></p>
+        <div class="flex flex-col py-2">
+          <label for="username">Username</label>
+          <input class="p-2 border rounded-lg" type="text" id="username" required />
+        </div>
+        <div class="flex flex-col py-2">
+          <label for="email">Email</label>
+          <input class="p-2 border rounded-lg" type="email" id="email" required />
+        </div>
+        <div class="flex flex-col py-2">
+          <label for="phone">Phone</label>
+          <input class="p-2 border rounded-lg" type="tel" id="phone" required />
+        </div>
+        <div class="flex flex-col py-2">
+          <label for="password">Password</label>
+          <input class="p-2 py-2 border rounded-lg" type="password" id="password" required />
+        </div>
+        <div class="flex flex-col py-2">
+          <label for="city">City</label>
+          <select class="w-full p-2 border rounded-lg" id="city" required>
+            <option value="">--------------select a city------------------</option>
+            <option value="Kigali">Kigali City</option>
+            <option value="Butare">Butare</option>
+            <option value="Gitarama">Gitarama</option>
+            <option value="Gisenyi">Gisenyi</option>
+            <option value="Ruhengeri">Ruhengeri</option>
+            <option value="Byumba">Byumba</option>
+            <option value="Cyangugu">Cyangugu</option>
+            <option value="Kibuye">Kibuye</option>
+            <option value="Rwamagana">Rwamagana</option>
+            <option value="Kibungo">Kibungo</option>
+            <option value="Nyanza">Nyanza</option>
+            <option value="Nyagatare">Nyagatare</option>
+            <option value="Muhanga">Muhanga</option>
+            <option value="Musanze">Musanze</option>
+            <option value="Huye">Huye</option>
+            <option value="Karongi">Karongi</option>
+            <option value="Nyamasheke">Nyamasheke</option>
+            <option value="Rusizi">Rusizi</option>
+            <option value="Rubavu">Rubavu</option>
+            <option value="Ngororero">Ngororero</option>
+            <option value="Bugesera">Bugesera</option>
+            <option value="Nyamagabe">Nyamagabe</option>
+            <option value="Kayonza">Kayonza</option>
+            <option value="Gicumbi">Gicumbi</option>
+            <option value="Rutsiro">Rutsiro</option>
+            <option value="Gakenke">Gakenke</option>
+            <option value="Kamonyi">Kamonyi</option>
+            <option value="Burera">Burera</option>
+            <option value="Ngoma">Ngoma</option>
+            <option value="Nyaruguru">Nyaruguru</option>
+            <option value="Rulindo">Rulindo</option>
+            <option value="Nyarugenge">Nyarugenge</option>
+            <option value="Gasabo">Gasabo</option>
+            <option value="Kicukiro">Kicukiro</option>
+          </select>
+        </div>
+        <button class="w-full my-5 text-white bg-indigo-600 border rounded-lg hover:bg-indigo-500">Sign up</button>
+        <div class="flex justify-center gap-2">
+          <p>Already have an account?</p>
+          <a class="text-indigo-600 hover:underline" href="/login">Sign In</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('register-form');
+    const errorEl = document.getElementById('error');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+      const payload = {
+        username: document.getElementById('username').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        password: document.getElementById('password').value,
+        city: document.getElementById('city').value,
+        roleKey: 'user'
+      };
+      try {
+        const res = await fetch('/api/register/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          // Collect error messages if serializer returns details
+          const detail = data?.detail || data?.message;
+          throw new Error(detail || 'Registration failed');
+        }
+        alert('Registration successful. Please sign in.');
+        window.location.href = '/login';
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
+
