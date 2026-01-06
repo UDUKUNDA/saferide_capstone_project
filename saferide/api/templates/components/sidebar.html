@@ -1,0 +1,71 @@
+<!-- Sidebar Component -->
+<!-- Mobile Header (Hamburger) -->
+<div class="fixed top-0 left-0 z-20 p-2 text-sm font-medium text-gray-900 bg-gray-100 dark:bg-gray-900 dark:text-white md:hidden w-full flex justify-between items-center shadow-md">
+    <h1 class="text-lg text-blue-600 font-bold px-2" onclick="window.location.href='/'">SafeRide</h1>
+    <button id="mobile-menu-btn" class="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
+        <i class="fas fa-bars text-xl"></i>
+    </button>
+</div>
+
+<!-- Sidebar -->
+<div id="sidebar" class="fixed top-0 left-0 z-30 h-screen bg-gray-100 border-r border-gray-300 transform -translate-x-full transition-transform duration-300 ease-in-out dark:border-gray-600 dark:bg-gray-900 dark:text-white md:translate-x-0 md:w-64 md:block">
+    <h1 class="hidden p-4 mt-4 text-3xl font-extrabold text-center text-blue-600 cursor-pointer md:block dark:text-blue-400" onclick="window.location.href='/'">
+        Safe Ride
+    </h1>
+
+    <ul class="flex flex-col mt-16 space-y-2 text-xl px-2">
+        <li class="flex items-center px-4 py-3 space-x-4 rounded transition-colors duration-200 cursor-pointer hover:text-white hover:bg-blue-600 {% if request.path == '/dashboard/' %}bg-blue-600 text-white{% endif %}" onclick="window.location.href='/dashboard'">
+            <i class="fas fa-tachometer-alt"></i>
+            <span class="md:inline">Dashboard</span>
+        </li>
+
+        <li class="flex items-center px-4 py-3 space-x-4 rounded transition-colors duration-200 cursor-pointer hover:text-white hover:bg-blue-600" onclick="window.location.href='/orders'">
+            <i class="fas fa-shopping-cart"></i>
+            <span class="md:inline">Orders</span>
+        </li>
+
+        <li class="flex items-center px-4 py-3 space-x-4 rounded transition-colors duration-200 cursor-pointer hover:text-white hover:bg-blue-600" onclick="window.location.href='/chat'">
+            <i class="fas fa-comments"></i>
+            <span class="md:inline">Chat</span>
+        </li>
+
+        <li class="flex items-center px-4 py-3 space-x-4 rounded transition-colors duration-200 cursor-pointer hover:text-white hover:bg-blue-600" onclick="window.location.href='/settings'">
+            <i class="fas fa-cog"></i>
+            <span class="md:inline">Settings</span>
+        </li>
+
+        <!-- Logout -->
+        <li class="flex items-center px-4 py-3 space-x-4 rounded transition-colors duration-200 cursor-pointer hover:text-white hover:bg-blue-600 mt-auto" onclick="handleLogout()">
+            <i class="fas fa-sign-out-alt"></i>
+            <span class="md:inline">Logout</span>
+        </li>
+    </ul>
+</div>
+
+<!-- Overlay for mobile -->
+<div id="sidebar-overlay" class="fixed inset-0 z-20 bg-black opacity-50 hidden md:hidden" onclick="toggleSidebar()"></div>
+
+<script>
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        if (sidebar.classList.contains('-translate-x-full')) {
+            sidebar.classList.remove('-translate-x-full');
+            overlay.classList.remove('hidden');
+        } else {
+            sidebar.classList.add('-translate-x-full');
+            overlay.classList.add('hidden');
+        }
+    }
+
+    document.getElementById('mobile-menu-btn')?.addEventListener('click', toggleSidebar);
+
+    function handleLogout() {
+        if(confirm("Are you sure you want to logout?")) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userData');
+            window.location.href = '/login';
+        }
+    }
+</script>

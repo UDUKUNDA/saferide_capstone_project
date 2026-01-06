@@ -1,0 +1,51 @@
+<!-- Navbar Component -->
+<div class="flex items-center justify-between p-4 text-gray-900 bg-gray-100 border-b border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+    <h1 class="text-2xl font-extrabold text-blue-600 dark:text-blue-400">
+        WELCOME {{ user.username|default:"Guest" }}
+    </h1>
+
+    <div class="flex items-center space-x-4">
+        <!-- Notification Icon (Mock) -->
+        <div class="relative cursor-pointer hover:text-blue-600">
+            <i class="fas fa-bell text-xl"></i>
+            <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">2</span>
+        </div>
+
+        <!-- Theme Toggle Button -->
+        <button id="theme-toggle" class="text-2xl focus:outline-none transition-colors duration-200 hover:text-blue-600">
+            <i id="theme-icon" class="fas fa-moon"></i>
+        </button>
+    </div>
+</div>
+
+<script>
+    // Theme Toggle Logic
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    const htmlElement = document.documentElement;
+
+    // Check Local Storage for Theme
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        htmlElement.classList.add('dark');
+        themeIcon.classList.remove('fa-moon');
+        themeIcon.classList.add('fa-sun');
+    } else {
+        htmlElement.classList.remove('dark');
+        themeIcon.classList.remove('fa-sun');
+        themeIcon.classList.add('fa-moon');
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+        if (htmlElement.classList.contains('dark')) {
+            htmlElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+            themeIcon.classList.remove('fa-sun');
+            themeIcon.classList.add('fa-moon');
+        } else {
+            htmlElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+            themeIcon.classList.remove('fa-moon');
+            themeIcon.classList.add('fa-sun');
+        }
+    });
+</script>

@@ -1,0 +1,127 @@
+<!-- MotoMap Component -->
+<div id="motomap-container" class="relative h-[50vh] w-full flex flex-col sm:flex-row hidden bg-gray-100 border-t border-gray-300 dark:border-gray-700">
+    <!-- Map View -->
+    <div id="motomap-map" class="w-full border-r border-gray-300 h-1/2 sm:h-full sm:w-1/2 dark:border-gray-700"></div>
+    
+    <!-- StreetView Panorama -->
+    <div id="motomap-pano" class="w-full border-r border-gray-300 h-1/2 sm:h-full sm:w-1/2 dark:border-gray-700"></div>
+
+    <!-- Address Info Overlay -->
+    <div class="absolute bottom-4 left-4 bg-white/90 p-4 rounded-lg shadow-lg max-w-xs z-10 backdrop-blur-sm dark:bg-gray-800/90 dark:text-white">
+        <h3 class="font-bold text-lg mb-2 text-blue-600 dark:text-blue-400">Address Information</h3>
+        <div id="motomap-address-content">
+            <p class="text-sm text-gray-500 animate-pulse">Waiting for location...</p>
+        </div>
+        <button onclick="closeMotoMap()" class="absolute top-2 right-2 text-gray-500 hover:text-red-500">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+
+<script>
+    let motoMapInstance;
+    let motoPanoInstance;
+    let motoGeocoder;
+    let motoMapMarker;
+
+    /**
+     * Initializes the MotoMap component with specific coordinates.
+     * @param {number} lat - Latitude
+     * @param {number} lng - Longitude
+     */
+    function initMotoMap(lat, lng) {
+        const container = document.getElementById('motomap-container');
+        container.classList.remove('hidden');
+
+        // Ensure Google Maps API is loaded
+        if (typeof google === 'undefined' || !google.maps) {
+            console.error('Google Maps API not loaded. Attempting to load...');
+            // Fallback loading if not present (though dashboard loads it)
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDHWREpVjjj9oC19N63SpZ6HnGSZzlpx9k&libraries=places&callback=()=>initMotoMap(${lat},${lng})`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+            return;
+        }
+
+        const position = { lat: parseFloat(lat), lng: parseFloat(lng) };
+
+        if (isNaN(position.lat) || isNaN(position.lng)) {
+            console.error('Invalid coordinates for MotoMap', position);
+            return;
+        }
+
+        // Initialize Map
+        const mapElement = document.getElementById('motomap-map');
+        if (mapElement) {
+            motoMapInstance = new google.maps.Map(mapElement, {
+                center: position,
+                zoom: 14,
+                streetViewControl: false // We have a dedicated pano
+            });
+
+            motoMapMarker = new google.maps.Marker({
+                position: position,
+                map: motoMapInstance,
+                title: 'Target Location'
+            });
+        }
+
+        // Initialize Panorama
+        const panoElement = document.getElementById('motomap-pano');
+        if (panoElement) {
+            motoPanoInstance = new google.maps.StreetViewPanorama(panoElement, {
+                position: position,
+                pov: {
+                    heading: 34,
+                    pitch: 10,
+                },
+                visible: true,
+            });
+            // Link map to pano
+            motoMapInstance.setStreetView(motoPanoInstance);
+        }
+
+        // Reverse Geocoding
+        motoGeocoder = new google.maps.Geocoder();
+        updateAddressInfo(position);
+    }
+
+    function updateAddressInfo(position) {
+        const contentDiv = document.getElementById('motomap-address-content');
+        contentDiv.innerHTML = '<p class="text-sm text-gray-500"><i class="fas fa-spinner fa-spin"></i> Fetching address...</p>';
+
+        motoGeocoder.geocode({ location: position }, (results, status) => {
+            if (status === 'OK' && results[0]) {
+                const result = results[0];
+                
+                const getComponent = (type) => {
+                    const comp = result.address_components.find(c => c.types.includes(type));
+                    return comp ? comp.long_name : 'N/A';
+                };
+
+                const addressData = {
+                    formatted: result.formatted_address,
+                    locality: getComponent('locality'),
+                    area: getComponent('administrative_area_level_1'),
+                    street: getComponent('street_address') || getComponent('route')
+                };
+
+                contentDiv.innerHTML = `
+                    <ul class="text-sm space-y-1">
+                        <li><strong>Address:</strong> ${addressData.formatted}</li>
+                        <li><strong>Locality:</strong> ${addressData.locality}</li>
+                        <li><strong>Area:</strong> ${addressData.area}</li>
+                    </ul>
+                `;
+            } else {
+                contentDiv.innerHTML = `<p class="text-red-500 text-sm">Address not found (${status})</p>`;
+            }
+        });
+    }
+
+    function closeMotoMap() {
+        document.getElementById('motomap-container').classList.add('hidden');
+    }
+</script>
