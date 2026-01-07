@@ -57,8 +57,38 @@
           localStorage.setItem('token', token);
           localStorage.setItem('userData', JSON.stringify(user));
           sessionStorage.setItem('justLoggedIn', 'true');
-          alert(data.message || 'Login successful');
-          window.location.href = '/dashboard';
+
+          // Capture Location
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              async (position) => {
+                const { latitude, longitude } = position.coords;
+                try {
+                  await fetch(`/api/users/${user.id}/location/`, {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ latitude, longitude })
+                  });
+                  console.log('Location updated');
+                } catch (locErr) {
+                  console.warn('Failed to update location:', locErr);
+                }
+                alert(data.message || 'Login successful');
+                window.location.href = '/dashboard';
+              },
+              (err) => {
+                console.warn('Geolocation denied or failed:', err);
+                alert(data.message || 'Login successful (Location not captured)');
+                window.location.href = '/dashboard';
+              }
+            );
+          } else {
+             alert(data.message || 'Login successful');
+             window.location.href = '/dashboard';
+          }
         } else {
           throw new Error('Invalid response format from server');
         }

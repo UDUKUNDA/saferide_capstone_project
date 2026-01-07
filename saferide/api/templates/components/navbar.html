@@ -4,7 +4,7 @@
 
 <div class="flex items-center justify-between p-4 text-gray-900 bg-gray-100 border-b border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white relative">
     <h1 class="text-2xl font-extrabold text-blue-600 dark:text-blue-400">
-        WELCOME {{ user.username|default:"Guest" }}
+        <span id="welcome-text">WELCOME {{ user.username|default:"Guest" }}</span>
     </h1>
 
     <div class="flex items-center space-x-4">
@@ -49,7 +49,44 @@
     </div>
 </div>
 
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
+    // --- User Session Display ---
+    (function syncWelcomeName() {
+        try {
+            const lsUser = localStorage.getItem('userData');
+            if (lsUser) {
+                const u = JSON.parse(lsUser);
+                const w = document.getElementById('welcome-text');
+                if (u?.username && w) w.textContent = `WELCOME ${u.username}`;
+            }
+        } catch (e) {}
+    })();
+
+    // --- Socket Initialization ---
+    (function initSocket() {
+        if (window.socket) return;
+        try {
+            const host = window.location.hostname || 'localhost';
+            window.socket = io(`http://${host}:3000`, { transports: ['websocket', 'polling'] });
+            const lsUser = localStorage.getItem('userData');
+            if (lsUser) {
+                const u = JSON.parse(lsUser);
+                if (u?.id) window.socket.emit('addNewUser', u.id);
+            }
+            window.onlineUsers = [];
+            window.socket.on('getOnlineUsers', (list) => { window.onlineUsers = list; });
+            window.socket.on('getNotification', (n) => {
+                try {
+                    if (typeof notifications !== 'undefined') {
+                        notifications.unshift(n);
+                        renderNotifications();
+                    }
+                } catch (e) {}
+            });
+        } catch (e) { }
+    })();
+
     // --- Notification Logic ---
     const notifBtn = document.getElementById('notification-btn');
     const notifDropdown = document.getElementById('notification-dropdown');

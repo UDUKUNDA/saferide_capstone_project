@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRide - Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="bg-gray-100 h-full flex flex-col md:flex-row overflow-hidden dark:bg-gray-900">
+    {% include "components/sidebar.html" %}
+
+    <div class="flex-1 flex flex-col md:ml-64 transition-all duration-300 h-full overflow-y-auto">
+        {% include "components/navbar.html" %}
+
+        <main class="flex-1 p-4 sm:px-6 lg:px-8 bg-gray-900 min-h-screen">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <!-- Left: Users and Conversations -->
+                <div class="p-4 bg-gray-800 rounded-lg shadow md:col-span-1">
+                    <h3 class="mb-3 text-lg font-semibold text-white">Start a chat</h3>
+                    <div class="text-sm text-gray-400 mb-2">Choose a user to chat with</div>
+                    <ul id="user-list-container" class="space-y-2"></ul>
+                    <hr class="my-4 border-gray-700">
+                    <h3 class="mb-2 text-lg font-semibold text-white">My Conversations</h3>
+                    <ul id="conversations-list" class="space-y-2"></ul>
+                </div>
+
+                <!-- Right: Chat box -->
+                <div class="flex flex-col p-4 bg-gray-800 rounded-lg shadow md:col-span-2">
+                    <!-- Chat header -->
+                    <div id="chat-header" class="flex items-center p-4 text-white bg-gray-900 border-b border-gray-700 rounded-t-lg">
+                        <div id="recipient-avatar" class="hidden w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-white"></div>
+                        <div id="recipient-info" class="ml-4 hidden">
+                            <h2 id="recipient-name" class="text-lg font-bold"></h2>
+                            <div id="recipient-online" class="text-sm text-gray-400"></div>
+                        </div>
+                        <button id="view-location-btn" class="hidden ml-auto p-2 bg-gray-300 text-gray-900 rounded-full hover:bg-gray-400">
+                            <i class="fas fa-map-marker-alt mr-1"></i> View Location
+                        </button>
+                    </div>
+
+                    <!-- Messages -->
+                    <div id="messages-container" class="flex-grow p-4 overflow-y-auto bg-gray-800 shadow-inner min-h-[300px]"></div>
+
+                    <!-- Input -->
+                    <div id="input-section" class="flex items-center p-2 bg-gray-900 border-t border-gray-700 md:p-4 rounded-b-lg hidden">
+                        <select id="sender-language" class="w-1/3 p-2 mr-2 text-gray-900 bg-gray-300 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 md:w-1/4">
+                            <option value="en">English</option>
+                            <option value="fr">French</option>
+                            <option value="rw">Kinyarwanda</option>
+                            <option value="sw">Swahili</option>
+                            <option value="es">Spanish</option>
+                            <option value="zh">Chinese</option>
+                            <option value="hi">Hindi</option>
+                            <option value="ar">Arabic</option>
+                            <option value="bn">Bengali</option>
+                        </select>
+                        <input id="message-input" type="text" placeholder="Type a message" class="flex-grow p-2 border border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100">
+                        <button id="send-btn" class="p-2 ml-2 text-white bg-blue-600 rounded-full hover:bg-blue-700">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    {% include "components/motomap.html" %}
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        let token = localStorage.getItem('token');
+        let currentUser = null;
+        let users = [];
+        let onlineUsers = window.onlineUsers || [];
+        let currentChat = null;
+        let recipientUser = null;
+
+        async function apiGet(url) {
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) throw new Error(await res.text());
+            return res.json();
+        }
+        async function apiPost(url, body) {
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(body) });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || data?.message || 'Request failed');
+            return data;
+        }
+
+        function renderUserSelectionList(_users, _onlineUsers, title, onSelectUser) {
+            const container = document.getElementById('user-list-container');
+            container.innerHTML = '';
+            if (!_users || _users.length === 0) {
+                container.innerHTML = '<li class="text-center text-gray-500 py-4">No users found.</li>';
+                return;
+            }
+            _users.forEach(user => {
+                const isOnline = _onlineUsers?.some(u => u.userId === user.id);
+                const li = document.createElement('li');
+                li.className = "flex items-center p-3 rounded-md cursor-pointer transition-colors duration-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700";
+                li.innerHTML = `
+                    <span class="w-3 h-3 mr-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-400'}"></span>
+                    <div class="flex-1">
+                        <p class="font-medium text-sm">${user.username}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">${user.roleKey || 'User'}</p>
+                    </div>
+                `;
+                li.onclick = () => onSelectUser(user.id);
+                container.appendChild(li);
+            });
+        }
+
+        function setRecipientHeader(user) {
+            const avatar = document.getElementById('recipient-avatar');
+            const info = document.getElementById('recipient-info');
+            const nameEl = document.getElementById('recipient-name');
+            const onlineEl = document.getElementById('recipient-online');
+            const locBtn = document.getElementById('view-location-btn');
+
+            avatar.textContent = user.username ? user.username[0] : '?';
+            avatar.classList.remove('hidden');
+            info.classList.remove('hidden');
+            nameEl.textContent = user.username || 'Unknown';
+            const isOnline = onlineUsers?.some(u => u.userId === user.id);
+            onlineEl.textContent = isOnline ? 'Online' : 'Offline';
+            onlineEl.className = `text-sm ${isOnline ? 'text-green-400' : 'text-gray-400'}`;
+            locBtn.classList.remove('hidden');
+
+            locBtn.onclick = () => {
+                initMotoMap(user.latitude || -1.9441, user.longitude || 30.0619);
+            };
+        }
+
+        function renderMessages(messages) {
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '';
+            if (!messages || messages.length === 0) {
+                container.innerHTML = '<div class="text-gray-400">No messages yet. Say hi!</div>';
+                return;
+            }
+            messages.forEach(message => {
+                const isMine = message.senderId === currentUser.id;
+                const row = document.createElement('div');
+                row.className = isMine ? "flex items-end justify-end mb-2" : "flex items-start mb-2";
+                row.innerHTML = isMine ? `
+                    <div class="p-3 mr-2 text-white bg-blue-600 rounded-lg shadow-sm">
+                        <p>${message.text}</p>
+                        <span class="text-xs text-gray-200">${new Date(message.created_at || message.createdAt).toLocaleString()}</span>
+                    </div>
+                    <div class="flex items-center justify-center w-8 h-8 text-white bg-blue-600 rounded-full">${(currentUser.username||'?')[0]}</div>
+                ` : `
+                    <div class="flex items-center justify-center w-8 h-8 text-white bg-gray-700 rounded-full">${(recipientUser?.username||'?')[0]}</div>
+                    <div class="p-3 ml-2 bg-gray-200 rounded-lg shadow-sm">
+                        <p class="text-gray-900">${message.text}</p>
+                        <span class="text-xs text-gray-500">${new Date(message.created_at || message.createdAt).toLocaleString()}</span>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function loadMessages(chatId) {
+            const data = await apiGet(`/api/messages/${chatId}/`);
+            renderMessages(data);
+        }
+
+        async function createOrGetChat(recipientId) {
+            // Try find existing chat
+            try {
+                const found = await apiGet(`/api/chats/find/${currentUser.id}/${recipientId}/`);
+                currentChat = found;
+            } catch (e) {
+                // Not found => create
+                currentChat = await apiPost('/api/chats/', { senderId: currentUser.id, receiverId: recipientId });
+            }
+            // Fetch recipient details
+            recipientUser = await apiGet(`/api/users/${recipientId}/`);
+            setRecipientHeader(recipientUser);
+            document.getElementById('input-section').classList.remove('hidden');
+            await loadMessages(currentChat.id);
+            try {
+                const sock = window.socket || io(`http://${window.location.hostname}:3000`);
+                sock.emit('addNewUser', currentUser.id);
+            } catch (e) {}
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            if (!text || !currentChat) return;
+            const lang = document.getElementById('sender-language').value || 'en';
+            await apiPost('/api/messages/', {
+                chatId: currentChat.id,
+                senderId: currentUser.id,
+                text,
+                senderLanguage: lang
+            });
+            input.value = '';
+            await loadMessages(currentChat.id);
+            try {
+                if (window.socket && window.socket.readyState === WebSocket.OPEN) {
+                    window.socket.send(JSON.stringify({
+                        type: 'sendMessage',
+                        senderId: currentUser.id,
+                        recipientId: recipientUser?.id,
+                        text
+                    }));
+                }
+            } catch (e) {
+                console.error("Socket send error:", e);
+            }
+        }
+
+        async function initChatPage() {
+            if (!token) {
+                alert('Please login first.');
+                window.location.href = '/login';
+                return;
+            }
+            try {
+                // Try server-based user first
+                try {
+                    const me = await apiGet('/api/current-user/');
+                    currentUser = me.data || me;
+                    // Persist to localStorage for consistency
+                    if (currentUser) localStorage.setItem('userData', JSON.stringify(currentUser));
+                } catch (e) {
+                    // Fallback to localStorage if API fails (e.g., token issues)
+                    const lsUser = localStorage.getItem('userData');
+                    if (!lsUser) throw e;
+                    currentUser = JSON.parse(lsUser);
+                }
+                // Init WebSocket instead of Socket.IO
+                initWebSocket();
+
+                users = await apiGet('/api/users/');
+                // Exclude current user
+                users = users.filter(u => u.id !== currentUser.id);
+
+                renderUserSelectionList(users, onlineUsers, 'Choose a user', async (userId) => {
+                    await createOrGetChat(userId);
+                });
+                
+                // Render conversations
+                await loadConversations();
+                document.getElementById('send-btn').onclick = sendMessage;
+                document.getElementById('view-location-btn').onclick = () => {
+                    if (recipientUser) initMotoMap(recipientUser.latitude || -1.9441, recipientUser.longitude || 30.0619);
+                };
+            } catch (error) {
+                console.error('Failed to initialize chat page:', error);
+                alert('Failed to load chat page. Please ensure you are logged in.');
+            }
+        }
+
+    // --- WebSocket Logic (Replaces Socket.IO) ---
+    const user = JSON.parse(localStorage.getItem('userData'));
+    let socket;
+
+    // Helper to send JSON messages
+    function sendSocketMessage(type, data) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type, ...data }));
+      }
+    }
+
+    function initWebSocket() {
+      // Connect to Django Channels WebSocket
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/chat/`;
+      socket = new WebSocket(wsUrl);
+      window.socket = socket; // Make global
+
+      socket.onopen = () => {
+        console.log('Connected to WebSocket');
+        // Register user
+        if (currentUser && currentUser.id) {
+          sendSocketMessage('addNewUser', { userId: currentUser.id });
+        }
+      };
+
+      socket.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        const { type, data } = payload;
+
+        switch (type) {
+          case 'getOnlineUsers':
+            onlineUsers = data;
+            // Optionally refresh UI if needed
+            break;
+          
+          case 'getMessage':
+            const msg = data;
+            if (msg && currentChat && recipientUser && (msg.senderId === recipientUser.id)) {
+                const container = document.getElementById('messages-container');
+                const row = document.createElement('div');
+                row.className = "flex items-start mb-2";
+                row.innerHTML = `
+                    <div class="flex items-center justify-center w-8 h-8 text-white bg-gray-700 rounded-full">${(recipientUser?.username||'?')[0]}</div>
+                    <div class="p-3 ml-2 bg-gray-200 rounded-lg shadow-sm">
+                        <p class="text-gray-900">${msg.text}</p>
+                        <span class="text-xs text-gray-500">${new Date().toLocaleString()}</span>
+                    </div>
+                `;
+                container.appendChild(row);
+                container.scrollTop = container.scrollHeight;
+            }
+            break;
+
+          case 'getNotification':
+             // Handle notification
+             console.log('Notification:', data);
+             break;
+        }
+      };
+
+      socket.onclose = () => {
+        console.log('WebSocket disconnected. Reconnecting...');
+        setTimeout(initWebSocket, 3000);
+      };
+      
+      socket.onerror = (err) => {
+        console.error('WebSocket error:', err);
+      };
+    }
+    // --- End WebSocket Logic ---
+            const listEl = document.getElementById('conversations-list');
+            listEl.innerHTML = '<li class="text-gray-400">Loading...</li>';
+            try {
+                const chats = await apiGet(`/api/chats/user/${currentUser.id}/`);
+                if (!Array.isArray(chats) || chats.length === 0) {
+                    listEl.innerHTML = '<li class="text-gray-500">No conversations yet.</li>';
+                    return;
+                }
+                listEl.innerHTML = '';
+                for (const chat of chats) {
+                    const recipientId = (chat.members || []).find(m => m !== currentUser.id);
+                    if (!recipientId) continue;
+                    let recipient = null;
+                    try {
+                        recipient = await apiGet(`/api/users/${recipientId}/`);
+                    } catch (e) {}
+                    const isOnline = onlineUsers?.some(u => u.userId === recipient?.id);
+                    const item = document.createElement('li');
+                    item.className = "flex items-center space-x-4 p-2 rounded hover:bg-gray-700 cursor-pointer";
+                    const initial = recipient?.username ? recipient.username[0] : '?';
+                    item.innerHTML = `
+                        <div class="relative flex items-center justify-center flex-shrink-0 w-10 h-10 text-white bg-black rounded-full">
+                            ${initial}
+                            ${isOnline ? '<span class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>' : ''}
+                        </div>
+                        <div class="flex flex-col">
+                            <div class="text-sm font-medium text-gray-100">${recipient?.username || 'Unknown'} ${recipient?.roleKey || ''}</div>
+                            <div class="mt-1 text-xs font-semibold text-red-500"></div>
+                        </div>
+                    `;
+                    item.onclick = async () => {
+                        await createOrGetChat(recipientId);
+                    };
+                    listEl.appendChild(item);
+                }
+            } catch (error) {
+                listEl.innerHTML = '<li class="text-red-500">Failed to load conversations.</li>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initChatPage);
+    </script>
+</body>
+</html>

@@ -104,9 +104,19 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          // Collect error messages if serializer returns details
           const detail = data?.detail || data?.message;
-          throw new Error(detail || 'Registration failed');
+          const errs = data?.errors;
+          let messages = [];
+          if (errs && typeof errs === 'object') {
+            for (const [field, value] of Object.entries(errs)) {
+              const arr = Array.isArray(value) ? value : [value];
+              for (const m of arr) {
+                messages.push(`${field}: ${m}`);
+              }
+            }
+          }
+          const msg = messages.length ? messages.join(' | ') : (detail || 'Registration failed');
+          throw new Error(msg);
         }
         alert('Registration successful. Please sign in.');
         window.location.href = '/login';
@@ -118,4 +128,3 @@
   </script>
 </body>
 </html>
-

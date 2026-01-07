@@ -139,6 +139,7 @@
 
     <!-- Google Maps API Script -->
     <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initMap" async defer></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
     <script>
         // --- State Variables ---
@@ -158,10 +159,20 @@
             username: "{{ user.username|default:'Guest' }}" 
         }; 
         
-        // Mock Socket
-        const socket = {
-            emit: (event, data) => console.log(`[Socket] Emitting '${event}':`, data)
-        };
+        const socket = (function() {
+            try {
+                const host = window.location.hostname || 'localhost';
+                const s = window.socket || io(`http://${host}:3000`, { transports: ['websocket', 'polling'] });
+                const lsUser = localStorage.getItem('userData');
+                if (lsUser) {
+                    const u = JSON.parse(lsUser);
+                    if (u?.id) s.emit('addNewUser', u.id);
+                }
+                return s;
+            } catch (e) {
+                return { emit: () => {} };
+            }
+        })();
 
         // Mock Drivers Data (simulating mapusers from useChat)
         const mockDrivers = [

@@ -18,13 +18,19 @@ class RegisterUserView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            
-            # Generate token
+            try:
+                user = serializer.save()
+            except Exception as e:
+                logger.error(f"Registration save error: {e}")
+                return Response(
+                    {'message': 'Registration failed', 'errors': {'non_field_errors': [str(e)]}},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             from rest_framework_simplejwt.tokens import RefreshToken
             refresh = RefreshToken.for_user(user)
-            
+            logger.info(f"User registered: id={user.id} email={user.email}")
             return Response({
+                'message': 'Registration successful',
                 'id': str(user.id),
                 'username': user.username,
                 'email': user.email,
@@ -34,7 +40,8 @@ class RegisterUserView(generics.CreateAPIView):
                 'access': str(refresh.access_token),
                 'refresh': str(refresh)
             }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        logger.warning(f"Registration validation errors: {serializer.errors}")
+        return Response({'message': 'Registration failed', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginUserView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -242,6 +249,9 @@ def driver_dashboard_page(request):
 
 def settings_page(request):
     return render(request, "settings.html")
+
+def chat_page(request):
+    return render(request, "chat.html")
 class AddMessageView(APIView):
     permission_classes = [IsAuthenticated]
     

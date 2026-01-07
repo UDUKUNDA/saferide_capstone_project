@@ -17,7 +17,7 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from api.views import landing, login_page, dashboard_page, register_page, orders_page, settings_page
+from api.views import landing, login_page, dashboard_page, register_page, orders_page, settings_page, driver_dashboard_page, chat_page
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -28,5 +28,6 @@ urlpatterns = [
     path("orders/", orders_page, name="orders"),
     path("driver/dashboard/", driver_dashboard_page, name="driver-dashboard"),
     path("settings/", settings_page, name="settings"),
+    path("chat/", chat_page, name="chat"),
     path("api/", include("api.urls")),
 ]
