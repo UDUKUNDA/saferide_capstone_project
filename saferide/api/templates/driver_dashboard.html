@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRide - Driver Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        // Check for saved theme preference
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="bg-gray-100 h-full flex flex-col md:flex-row overflow-hidden dark:bg-gray-900">
+
+    <!-- Include Sidebar -->
+    {% include "components/sidebar.html" %}
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col md:ml-64 transition-all duration-300 h-full overflow-y-auto">
+        
+        <!-- Include Navbar -->
+        {% include "components/navbar.html" %}
+
+        <!-- Driver Dashboard Content -->
+        <main class="flex-1 p-4 sm:px-6 lg:px-8 bg-gray-900 min-h-screen text-white">
+            <h2 class="mb-4 text-xl font-bold text-center">Driver Dashboard</h2>
+
+            <!-- Status Message -->
+            <div id="status-message" class="hidden p-2 mt-4 mb-4 text-yellow-900 bg-yellow-100 rounded dark:bg-yellow-700 dark:text-yellow-200"></div>
+
+            <!-- Current Ride Section -->
+            <div id="current-ride-section" class="hidden mb-4 p-4 bg-gray-800 rounded shadow-lg border border-gray-700">
+                <h3 class="text-lg font-semibold mb-2 text-green-400">Current Ride</h3>
+                <p>Customer: <span id="current-customer"></span></p>
+                <p>Pickup: <span id="current-pickup"></span></p>
+                <p>Destination: <span id="current-destination"></span></p>
+                <div class="flex justify-end mt-2 space-x-2">
+                    <button 
+                        onclick="window.location.href='/chat'"
+                        class="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600 transition"
+                    >
+                        Talk to the customer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Current Orders List -->
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold mb-2">Current Orders</h3>
+                <div id="orders-list" class="space-y-2">
+                    <p class="text-gray-400 italic">Loading orders...</p>
+                </div>
+                <p id="no-orders-msg" class="hidden text-gray-400">No new orders.</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // State
+        let orders = [];
+        let selectedOrder = null;
+        let serviceHistory = [];
+        const currentUser = {
+            id: "{{ user.id }}",
+            roleKey: "{{ user.roleKey|default:'driver' }}" // Default to driver for this view
+        };
+
+        // DOM Elements
+        const ordersListEl = document.getElementById('orders-list');
+        const noOrdersMsgEl = document.getElementById('no-orders-msg');
+        const currentRideSection = document.getElementById('current-ride-section');
+        const statusMessageEl = document.getElementById('status-message');
+
+        // Fetch Orders
+        async function fetchOrders() {
+            try {
+                const response = await fetch('/api/orders/all/', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch orders');
+
+                const allOrders = await response.json();
+                
+                // Filter logic: Show orders where current user is the receiver (driver)
+                // or if testing as client, show sent orders (mimicking React logic)
+                const isClient = currentUser.roleKey === 'client';
+                
+                orders = allOrders.filter(order => 
+                    isClient 
+                        ? order.sender === currentUser.id 
+                        : order.receiver === currentUser.id
+                );
+
+                renderOrders();
+
+            } catch (error) {
+                console.error('Error fetching orders:', error);
+                ordersListEl.innerHTML = '<p class="text-red-500">Failed to load orders.</p>';
+            }
+        }
+
+        // Render Orders
+        function renderOrders() {
+            ordersListEl.innerHTML = '';
+            
+            if (orders.length === 0) {
+                noOrdersMsgEl.classList.remove('hidden');
+                return;
+            }
+            
+            noOrdersMsgEl.classList.add('hidden');
+
+            orders.forEach(order => {
+                const li = document.createElement('div');
+                li.className = "p-3 bg-gray-800 rounded-md shadow border border-gray-700 hover:bg-gray-750 transition";
+                li.innerHTML = `
+                    <p><span class="font-bold text-gray-400">Customer:</span> ${order.senderName}</p>
+                    <p><span class="font-bold text-gray-400">Pickup:</span> ${order.origin}</p>
+                    <p><span class="font-bold text-gray-400">Destination:</span> ${order.destination}</p>
+                    <div class="flex justify-end mt-2 space-x-2">
+                        <button 
+                            onclick="handleAccept('${order.id}')"
+                            class="px-4 py-2 text-white bg-green-500 rounded hover:bg-green-600 transition text-sm font-medium"
+                        >
+                            Accept
+                        </button>
+                        <button 
+                            onclick="handleDecline('${order.id}')"
+                            class="px-4 py-2 text-white bg-red-500 rounded hover:bg-red-600 transition text-sm font-medium"
+                        >
+                            Decline
+                        </button>
+                    </div>
+                `;
+                ordersListEl.appendChild(li);
+            });
+        }
+
+        // Handle Accept
+        function handleAccept(orderId) {
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+
+            selectedOrder = order;
+            serviceHistory.push(order);
+            
+            // Update UI
+            document.getElementById('current-customer').textContent = order.senderName;
+            document.getElementById('current-pickup').textContent = order.origin;
+            document.getElementById('current-destination').textContent = order.destination;
+            
+            currentRideSection.classList.remove('hidden');
+            showStatus(`Accepted order from ${order.senderName}`);
+            
+            // Remove from list (optional, based on React logic usually accepted orders move out of pending)
+            // orders = orders.filter(o => o.id !== orderId);
+            // renderOrders();
+        }
+
+        // Handle Decline (Delete)
+        async function handleDecline(orderId) {
+            if (!confirm('Are you sure you want to decline this order?')) return;
+
+            try {
+                const response = await fetch(`/api/orders/${orderId}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    orders = orders.filter(o => o.id !== orderId);
+                    renderOrders();
+                    showStatus('Order declined and deleted');
+                    
+                    if (selectedOrder && selectedOrder.id === orderId) {
+                        selectedOrder = null;
+                        currentRideSection.classList.add('hidden');
+                    }
+                } else {
+                    throw new Error('Failed to delete');
+                }
+            } catch (error) {
+                console.error('Failed to delete order:', error);
+                showStatus('Failed to delete the order');
+            }
+        }
+
+        // Show Status Helper
+        function showStatus(msg) {
+            statusMessageEl.textContent = msg;
+            statusMessageEl.classList.remove('hidden');
+            setTimeout(() => {
+                statusMessageEl.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', fetchOrders);
+
+    </script>
+</body>
+</html>

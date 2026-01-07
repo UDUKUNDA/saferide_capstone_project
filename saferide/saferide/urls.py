@@ -26,6 +26,7 @@ urlpatterns = [
     path("register/", register_page, name="register"),
     path("dashboard/", dashboard_page, name="dashboard"),
     path("orders/", orders_page, name="orders"),
+    path("driver/dashboard/", driver_dashboard_page, name="driver-dashboard"),
     path("settings/", settings_page, name="settings"),
     path("api/", include("api.urls")),
 ]

@@ -237,6 +237,9 @@ def register_page(request):
 def orders_page(request):
     return render(request, "orders.html")
 
+def driver_dashboard_page(request):
+    return render(request, "driver_dashboard.html")
+
 def settings_page(request):
     return render(request, "settings.html")
 class AddMessageView(APIView):

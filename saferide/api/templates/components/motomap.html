@@ -38,7 +38,7 @@
             console.error('Google Maps API not loaded. Attempting to load...');
             // Fallback loading if not present (though dashboard loads it)
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDHWREpVjjj9oC19N63SpZ6HnGSZzlpx9k&libraries=places&callback=()=>initMotoMap(${lat},${lng})`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=()=>initMotoMap(${lat},${lng})`;
             script.async = true;
             script.defer = true;
             document.head.appendChild(script);
