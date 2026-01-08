@@ -15,7 +15,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'password', 'roleKey', 'city', 'phone']
+        fields = ['id', 'username', 'email', 'password', 'roleKey', 'city', 'phone', 'latitude', 'longitude']
     
     def validate_email(self, value):
         from django.core.validators import validate_email
@@ -37,7 +37,9 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             username=validated_data['username'],
             roleKey=validated_data['roleKey'],
             city=validated_data['city'],
-            phone=validated_data.get('phone', '')
+            phone=validated_data.get('phone', ''),
+            latitude=validated_data.get('latitude'),
+            longitude=validated_data.get('longitude')
         )
         return user
 

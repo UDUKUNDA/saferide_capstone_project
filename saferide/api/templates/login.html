@@ -6,6 +6,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SafeRide - Login</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translate3d(0, 20px, 0);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    .animate-fade-in-up {
+        animation: fadeInUp 0.3s ease-out forwards;
+    }
+  </style>
 </head>
 <body class="bg-gray-900">
   <div class="grid w-full h-screen grid-cols-1 sm:grid-cols-2">
@@ -33,13 +48,26 @@
     </div>
   </div>
 
+  <!-- Loading Modal -->
+  <div id="loading-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-70">
+    <div class="flex flex-col items-center p-8 bg-white rounded-2xl animate-fade-in-up">
+      <div class="w-12 h-12 mb-4 border-4 border-indigo-200 rounded-full animate-spin border-t-indigo-600"></div>
+      <h3 class="text-xl font-bold text-gray-800">Authenticating...</h3>
+      <p class="text-gray-500">Please wait while we verify your credentials.</p>
+    </div>
+  </div>
+
   <script>
     const form = document.getElementById('login-form');
     const errorEl = document.getElementById('error');
+    const loadingModal = document.getElementById('loading-modal');
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorEl.classList.add('hidden');
       errorEl.textContent = '';
+      loadingModal.classList.remove('hidden'); // Show loading modal
+
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       try {
@@ -76,23 +104,24 @@
                 } catch (locErr) {
                   console.warn('Failed to update location:', locErr);
                 }
-                alert(data.message || 'Login successful');
+                // alert(data.message || 'Login successful'); // Removed alert
                 window.location.href = '/dashboard';
               },
               (err) => {
                 console.warn('Geolocation denied or failed:', err);
-                alert(data.message || 'Login successful (Location not captured)');
+                // alert(data.message || 'Login successful (Location not captured)'); // Removed alert
                 window.location.href = '/dashboard';
               }
             );
           } else {
-             alert(data.message || 'Login successful');
+             // alert(data.message || 'Login successful'); // Removed alert
              window.location.href = '/dashboard';
           }
         } else {
           throw new Error('Invalid response format from server');
         }
       } catch (err) {
+        loadingModal.classList.add('hidden'); // Hide loading modal on error
         errorEl.textContent = err.message;
         errorEl.classList.remove('hidden');
       }

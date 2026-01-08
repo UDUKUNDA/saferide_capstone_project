@@ -6,6 +6,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SafeRide - Register</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translate3d(0, 20px, 0);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    .animate-fade-in-up {
+        animation: fadeInUp 0.3s ease-out forwards;
+    }
+  </style>
 </head>
 <body class="bg-gray-900">
   <div class="grid w-full h-screen grid-cols-1 sm:grid-cols-2">
@@ -72,6 +87,12 @@
             <option value="Kicukiro">Kicukiro</option>
           </select>
         </div>
+        
+        <!-- Location Status -->
+        <div class="py-2">
+           <p id="location-status" class="text-sm text-gray-500">📍 Waiting for location...</p>
+        </div>
+
         <button class="w-full my-5 text-white bg-indigo-600 border rounded-lg hover:bg-indigo-500">Sign up</button>
         <div class="flex justify-center gap-2">
           <p>Already have an account?</p>
@@ -81,20 +102,119 @@
     </div>
   </div>
 
+  <!-- Role Selection Modal -->
+  <div id="role-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
+    <div class="w-full max-w-lg p-6 bg-white rounded-2xl animate-fade-in-up">
+      <h2 class="mb-6 text-3xl font-bold text-center text-indigo-600">Choose Your Role</h2>
+      <p class="mb-8 text-center text-gray-600">How would you like to join SafeRide?</p>
+      
+      <div class="grid gap-4">
+        <button onclick="selectRole('driver')" class="flex items-center p-4 transition border-2 border-gray-200 rounded-xl hover:border-indigo-600 hover:bg-indigo-50 group">
+          <div class="p-3 mr-4 text-white bg-indigo-600 rounded-full">
+            🚗
+          </div>
+          <div class="text-left">
+            <h3 class="text-lg font-bold text-gray-800 group-hover:text-indigo-700">Driver</h3>
+            <p class="text-sm text-gray-500">I want to drive passengers.</p>
+          </div>
+        </button>
+
+        <button onclick="selectRole('rider')" class="flex items-center p-4 transition border-2 border-gray-200 rounded-xl hover:border-indigo-600 hover:bg-indigo-50 group">
+          <div class="p-3 mr-4 text-white bg-orange-500 rounded-full">
+            🏍️
+          </div>
+          <div class="text-left">
+            <h3 class="text-lg font-bold text-gray-800 group-hover:text-indigo-700">Motorcycle Rider</h3>
+            <p class="text-sm text-gray-500">I want to ride a moto taxi.</p>
+          </div>
+        </button>
+
+        <button onclick="selectRole('user')" class="flex items-center p-4 transition border-2 border-gray-200 rounded-xl hover:border-indigo-600 hover:bg-indigo-50 group">
+          <div class="p-3 mr-4 text-white bg-green-500 rounded-full">
+            👤
+          </div>
+          <div class="text-left">
+            <h3 class="text-lg font-bold text-gray-800 group-hover:text-indigo-700">Customer</h3>
+            <p class="text-sm text-gray-500">I want to request rides.</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Modal -->
+  <div id="loading-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-70">
+    <div class="flex flex-col items-center p-8 bg-white rounded-2xl animate-fade-in-up">
+      <div class="w-12 h-12 mb-4 border-4 border-indigo-200 rounded-full animate-spin border-t-indigo-600"></div>
+      <h3 class="text-xl font-bold text-gray-800">Registering...</h3>
+      <p class="text-gray-500">Please wait while we create your account.</p>
+    </div>
+  </div>
+
   <script>
     const form = document.getElementById('register-form');
     const errorEl = document.getElementById('error');
+    const locStatus = document.getElementById('location-status');
+    const roleModal = document.getElementById('role-modal');
+    const loadingModal = document.getElementById('loading-modal');
+    
+    let userLat = null;
+    let userLng = null;
+    let selectedRole = 'user'; // Default
+
+    // Function to handle role selection
+    function selectRole(role) {
+      selectedRole = role;
+      // Close modal
+      roleModal.style.display = 'none';
+      
+      // Update form title or add badge to show selected role (Optional visual feedback)
+      const title = document.querySelector('h2.text-indigo-600');
+      if (title) {
+        const roleName = role === 'rider' ? 'Moto Rider' : role.charAt(0).toUpperCase() + role.slice(1);
+        title.innerHTML = `SafeRide <span class="block text-lg font-normal text-gray-500">(${roleName})</span>`;
+      }
+    }
+
+    // Ensure modal is visible on load
+    // (It's visible by default in HTML, but we can ensure it if needed)
+
+    // Get Location on Load
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                userLat = position.coords.latitude;
+                userLng = position.coords.longitude;
+                locStatus.textContent = "📍 Location acquired";
+                locStatus.classList.remove('text-gray-500');
+                locStatus.classList.add('text-green-600');
+            },
+            (error) => {
+                console.error("Geolocation error:", error);
+                locStatus.textContent = "⚠️ Location denied or unavailable (will register without it)";
+                locStatus.classList.remove('text-gray-500');
+                locStatus.classList.add('text-orange-500');
+            }
+        );
+    } else {
+        locStatus.textContent = "❌ Geolocation not supported by this browser";
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorEl.classList.add('hidden');
       errorEl.textContent = '';
+      loadingModal.classList.remove('hidden'); // Show loading modal
+
       const payload = {
         username: document.getElementById('username').value.trim(),
         email: document.getElementById('email').value.trim(),
         phone: document.getElementById('phone').value.trim(),
         password: document.getElementById('password').value,
         city: document.getElementById('city').value,
-        roleKey: 'user'
+        roleKey: selectedRole,
+        latitude: userLat,
+        longitude: userLng
       };
       try {
         const res = await fetch('/api/register/', {
@@ -118,9 +238,10 @@
           const msg = messages.length ? messages.join(' | ') : (detail || 'Registration failed');
           throw new Error(msg);
         }
-        alert('Registration successful. Please sign in.');
+        // alert('Registration successful. Please sign in.'); // Removed alert
         window.location.href = '/login';
       } catch (err) {
+        loadingModal.classList.add('hidden'); // Hide loading modal on error
         errorEl.textContent = err.message;
         errorEl.classList.remove('hidden');
       }

@@ -1,4 +1,19 @@
 <!-- Sidebar Component -->
+<style>
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translate3d(0, 20px, 0);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    .animate-fade-in-up {
+        animation: fadeInUp 0.3s ease-out forwards;
+    }
+</style>
 <!-- Mobile Header (Hamburger) -->
 <div class="fixed top-0 left-0 z-20 p-2 text-sm font-medium text-gray-900 bg-gray-100 dark:bg-gray-900 dark:text-white md:hidden w-full flex justify-between items-center shadow-md">
     <h1 class="text-lg text-blue-600 font-bold px-2" onclick="window.location.href='/'">SafeRide</h1>
@@ -45,6 +60,33 @@
 <!-- Overlay for mobile -->
 <div id="sidebar-overlay" class="fixed inset-0 z-20 bg-black opacity-50 hidden md:hidden" onclick="toggleSidebar()"></div>
 
+<!-- Logout Confirmation Modal -->
+<div id="logout-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-50 transition-opacity duration-300">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-sm dark:bg-gray-800 dark:text-white transform transition-all scale-100 animate-fade-in-up">
+        <div class="text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4 dark:bg-red-900">
+                <i class="fas fa-sign-out-alt text-red-600 text-xl dark:text-red-300"></i>
+            </div>
+            <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">
+                Ready to Leave?
+            </h3>
+            <div class="mt-2">
+                <p class="text-sm text-gray-500 dark:text-gray-300">
+                    Are you sure you want to log out of SafeRide?
+                </p>
+            </div>
+        </div>
+        <div class="mt-6 flex justify-center space-x-3">
+            <button onclick="cancelLogout()" class="px-5 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium transition dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400">
+                Cancel
+            </button>
+            <button onclick="confirmLogout()" class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 shadow-lg">
+                Yes, Logout
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
     function toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
@@ -61,11 +103,20 @@
 
     document.getElementById('mobile-menu-btn')?.addEventListener('click', toggleSidebar);
 
+    // Logout Logic
+    const logoutModal = document.getElementById('logout-modal');
+
     function handleLogout() {
-        if(confirm("Are you sure you want to logout?")) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('userData');
-            window.location.href = '/login';
-        }
+        logoutModal.classList.remove('hidden');
+    }
+
+    function cancelLogout() {
+        logoutModal.classList.add('hidden');
+    }
+
+    function confirmLogout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userData');
+        window.location.href = '/login';
     }
 </script>
