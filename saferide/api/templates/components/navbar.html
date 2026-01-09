@@ -49,7 +49,6 @@
     </div>
 </div>
 
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
     // --- User Session Display ---
     (function syncWelcomeName() {
@@ -63,30 +62,6 @@
         } catch (e) {}
     })();
 
-    // --- Socket Initialization ---
-    (function initSocket() {
-        if (window.socket) return;
-        try {
-            const host = window.location.hostname || 'localhost';
-            window.socket = io(`http://${host}:3000`, { transports: ['websocket', 'polling'] });
-            const lsUser = localStorage.getItem('userData');
-            if (lsUser) {
-                const u = JSON.parse(lsUser);
-                if (u?.id) window.socket.emit('addNewUser', u.id);
-            }
-            window.onlineUsers = [];
-            window.socket.on('getOnlineUsers', (list) => { window.onlineUsers = list; });
-            window.socket.on('getNotification', (n) => {
-                try {
-                    if (typeof notifications !== 'undefined') {
-                        notifications.unshift(n);
-                        renderNotifications();
-                    }
-                } catch (e) {}
-            });
-        } catch (e) { }
-    })();
-
     // --- Notification Logic ---
     const notifBtn = document.getElementById('notification-btn');
     const notifDropdown = document.getElementById('notification-dropdown');
@@ -95,14 +70,12 @@
     const notifList = document.getElementById('notification-list');
     const markAllReadBtn = document.getElementById('mark-all-read');
 
-    // Mock Notifications Data (Replace with API/Socket data)
-    let notifications = [
-        { id: 1, senderName: 'Jean Claude', text: 'Hello, are you available?', date: new Date(Date.now() - 1000 * 60 * 5), isRead: false },
-        { id: 2, senderName: 'System', text: 'Welcome to SafeRide!', date: new Date(Date.now() - 1000 * 60 * 60 * 24), isRead: true }
-    ];
+    // Shared notifications array (managed by page-specific scripts like chat.html)
+    window.notifications = [];
 
-    function renderNotifications() {
-        const unreadCount = notifications.filter(n => !n.isRead).length;
+    // Expose render function globally so chat.html can trigger it
+    window.renderNotifications = function() {
+        const unreadCount = window.notifications.filter(n => !n.isRead).length;
         
         // Update Badge
         if (unreadCount > 0) {
@@ -114,12 +87,12 @@
 
         // Update List
         notifList.innerHTML = '';
-        if (notifications.length === 0) {
+        if (window.notifications.length === 0) {
             notifList.innerHTML = '<div class="text-center py-4 text-gray-500 text-sm">No new notifications</div>';
             return;
         }
 
-        notifications.forEach(n => {
+        window.notifications.forEach(n => {
             const item = document.createElement('div');
             item.className = `flex items-center p-3 text-sm rounded-lg cursor-pointer transition ${
                 n.isRead 
@@ -129,8 +102,8 @@
             
             item.innerHTML = `
                 <div class="flex-1">
-                    <p class="font-semibold">New message from ${n.senderName}</p>
-                    <p class="text-xs opacity-75">${moment(n.date).fromNow()}</p>
+                    <p class="font-semibold">New message from ${n.senderName || 'User'}</p>
+                    <p class="text-xs opacity-75">${moment(n.date || new Date()).fromNow()}</p>
                 </div>
                 ${!n.isRead ? '<span class="w-2 h-2 bg-blue-500 rounded-full ml-2"></span>' : ''}
             `;
@@ -138,18 +111,16 @@
             item.onclick = () => markAsRead(n.id);
             notifList.appendChild(item);
         });
-    }
+    };
 
     function markAsRead(id) {
-        notifications = notifications.map(n => n.id === id ? { ...n, isRead: true } : n);
+        window.notifications = window.notifications.map(n => n.id === id ? { ...n, isRead: true } : n);
         renderNotifications();
-        // Here you would also call API to update status
     }
 
     markAllReadBtn.onclick = () => {
-        notifications = notifications.map(n => ({ ...n, isRead: true }));
+        window.notifications = window.notifications.map(n => ({ ...n, isRead: true }));
         renderNotifications();
-        // API call to mark all read
     };
 
     // Toggle Dropdown

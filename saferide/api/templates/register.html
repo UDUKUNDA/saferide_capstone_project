@@ -224,19 +224,21 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          const detail = data?.detail || data?.message;
-          const errs = data?.errors;
-          let messages = [];
-          if (errs && typeof errs === 'object') {
-            for (const [field, value] of Object.entries(errs)) {
-              const arr = Array.isArray(value) ? value : [value];
-              for (const m of arr) {
-                messages.push(`${field}: ${m}`);
-              }
+          let errorMessage = data.message || 'Registration failed';
+          
+          if (data.errors) {
+            // Create a cleaner list of errors
+            const errorDetails = [];
+            for (const [key, value] of Object.entries(data.errors)) {
+              const fieldName = key === 'non_field_errors' ? '' : `${key.charAt(0).toUpperCase() + key.slice(1)}: `;
+              const message = Array.isArray(value) ? value[0] : value;
+              errorDetails.push(`${fieldName}${message}`);
+            }
+            if (errorDetails.length > 0) {
+              errorMessage = errorDetails.join('\n');
             }
           }
-          const msg = messages.length ? messages.join(' | ') : (detail || 'Registration failed');
-          throw new Error(msg);
+          throw new Error(errorMessage);
         }
         // alert('Registration successful. Please sign in.'); // Removed alert
         window.location.href = '/login';

@@ -1,10 +1,27 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from .models import User
 
 class ChatConsumer(AsyncWebsocketConsumer):
     # Track online users globally (in memory for now, use Redis for production scaling)
-    online_users = set()
+    # Dictionary format: { user_id: { id, username, roleKey, latitude, longitude, ... } }
+    online_users = {}
+
+    @database_sync_to_async
+    def get_user_details(self, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+            return {
+                'id': str(user.id),
+                'username': user.username,
+                'roleKey': user.roleKey,
+                'email': user.email,
+                'latitude': user.latitude,
+                'longitude': user.longitude
+            }
+        except User.DoesNotExist:
+            return None
 
     async def connect(self):
         # We can get user from scope if we use auth middleware, or pass via query param/message
@@ -26,16 +43,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             # Remove from online set
             if self.user_id in ChatConsumer.online_users:
-                ChatConsumer.online_users.remove(self.user_id)
+                ChatConsumer.online_users.pop(self.user_id, None)
                 # Broadcast updated list
                 await self.broadcast_online_users()
+                print(f"User {self.user_id} removed from online list. Total: {len(ChatConsumer.online_users)}")
 
     async def receive(self, text_data):
         data = json.loads(text_data)
         msg_type = data.get('type') or data.get('action') # handle both for flexibility
 
         if msg_type == 'addNewUser':
-            self.user_id = data.get('userId')
+            self.user_id = str(data.get('userId'))
             if self.user_id:
                 # Add to personal group for direct messaging
                 await self.channel_layer.group_add(
@@ -48,10 +66,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.channel_name
                 )
                 
-                # Add to online list
-                ChatConsumer.online_users.add(self.user_id)
-                # Broadcast online users to everyone
-                await self.broadcast_online_users()
+                # Fetch user details and add to online list
+                user_details = await self.get_user_details(self.user_id)
+                if user_details:
+                    ChatConsumer.online_users[self.user_id] = user_details
+                    # Broadcast online users to everyone
+                    await self.broadcast_online_users()
+                    print(f"User {self.user_id} added to online list. Total: {len(ChatConsumer.online_users)}")
 
         elif msg_type == 'sendMessage':
             # Handle sending a message
@@ -87,9 +108,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "global_updates",
             {
                 'type': 'online_users_update',
-                'users': list(ChatConsumer.online_users)
+                'users': list(ChatConsumer.online_users.values())
             }
         ) 
+
+    async def online_users_update(self, event):
+        users = event['users']
+        await self.send(text_data=json.dumps({
+            'type': 'getOnlineUsers',
+            'data': users
+        }))
 
     # --- Handlers for group messages ---
 
@@ -117,16 +145,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'getOrder',
             'data': order
-        }))
-
-    async def online_users_update(self, event):
-        users_list = event['users']
-        # Format list to match expected structure: [{userId, socketId}, ...]
-        # Since we don't track socketIds strictly the same way, we just send userIds or dummy socketIds
-        formatted_list = [{'userId': uid, 'socketId': 'ws'} for uid in users_list]
-        await self.send(text_data=json.dumps({
-            'type': 'getOnlineUsers',
-            'data': formatted_list
         }))
 
 from datetime import datetime

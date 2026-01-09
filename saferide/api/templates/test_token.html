@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Token Test</title>
+</head>
+<body>
+    <h1>Token Test Page</h1>
+    <div id="result"></div>
+    <script>
+        const token = localStorage.getItem('token');
+        const resultDiv = document.getElementById('result');
+        if (token) {
+            resultDiv.innerText = 'Token found: ' + token.substring(0, 20) + '...';
+            // Verify if it works with API
+            fetch('/api/current-user/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => res.json())
+            .then(data => {
+                resultDiv.innerHTML += '<br>API Check: ' + (data.data ? 'Success (' + data.data.username + ')' : 'Failed: ' + JSON.stringify(data));
+            })
+            .catch(err => {
+                resultDiv.innerHTML += '<br>API Error: ' + err.message;
+            });
+        } else {
+            resultDiv.innerText = 'No token found in localStorage.';
+        }
+    </script>
+</body>
+</html>

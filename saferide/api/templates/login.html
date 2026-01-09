@@ -78,12 +78,24 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data?.detail || data?.message || 'An error occurred');
+          let msg = data.message || 'Login failed';
+          // Check for field-specific errors or non_field_errors
+          if (data.non_field_errors) {
+            msg = data.non_field_errors.join(' ');
+          } else if (data.detail) {
+            msg = data.detail;
+          } else if (data.email) {
+            msg = Array.isArray(data.email) ? data.email[0] : data.email;
+          } else if (data.password) {
+            msg = Array.isArray(data.password) ? data.password[0] : data.password;
+          }
+          throw new Error(msg);
         }
         if (data && data.data) {
           const { token, user } = data.data;
           localStorage.setItem('token', token);
           localStorage.setItem('userData', JSON.stringify(user));
+          console.log("Logged in user:", user);
           sessionStorage.setItem('justLoggedIn', 'true');
 
           // Capture Location

@@ -43,6 +43,8 @@ class RegisterUserView(generics.CreateAPIView):
         logger.warning(f"Registration validation errors: {serializer.errors}")
         return Response({'message': 'Registration failed', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
+from django.contrib.auth import login
+
 class LoginUserView(APIView):
     permission_classes = [permissions.AllowAny]
     
@@ -50,6 +52,10 @@ class LoginUserView(APIView):
         serializer = UserLoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
+            
+            # Establish Django session for SSR
+            login(request, user)
+            
             return Response({
                 'data': {
                     'token': serializer.validated_data['access'],
@@ -250,8 +256,25 @@ def driver_dashboard_page(request):
 def settings_page(request):
     return render(request, "settings.html")
 
+from django.contrib.auth.decorators import login_required
+
+# @login_required(login_url='/login')  <-- Removed to prevent session-based redirect
 def chat_page(request):
-    return render(request, "chat.html")
+    # If user is not authenticated via session, we render the page anyway
+    # and let the client-side JS handle the redirect if the JWT token is missing/invalid.
+    # However, for SSR parts (like the user list), we need a fallback if request.user is anonymous.
+    
+    current_user = request.user if request.user.is_authenticated else None
+    
+    if current_user:
+        users = User.objects.exclude(id=current_user.id)
+    else:
+        users = [] # Empty list for anonymous users (JS will redirect)
+
+    return render(request, "chat.html", {
+        "users": users,
+        "currentUser": current_user
+    })
 class AddMessageView(APIView):
     permission_classes = [IsAuthenticated]
     

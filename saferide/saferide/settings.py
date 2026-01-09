@@ -30,7 +30,9 @@ SECRET_KEY = "django-insecure-@8+^j7e*)1k^k1lbs73y@c#ns6@)3#6-1)!nxcreh%2h9s_(dv
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 # Application definition
@@ -53,6 +55,8 @@ INSTALLED_APPS = [
     # Local apps
     'api',
 ]
+
+AUTH_USER_MODEL = 'api.User'
 
 ASGI_APPLICATION = "saferide.asgi.application"
 
@@ -170,6 +174,8 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=3),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }
 
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
