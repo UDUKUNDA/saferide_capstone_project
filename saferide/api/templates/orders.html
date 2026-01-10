@@ -44,8 +44,29 @@
 
     <script>
         // Use user ID from template or fallback to guest for testing
-        const currentUserId = "{{ user.id|default:'guest_id' }}";
-        const userRole = "{{ user.roleKey|default:'client' }}"; 
+        let currentUserId = "{{ user.id|default:'guest_id' }}";
+        let userRole = "{{ user.roleKey|default:'client' }}"; 
+
+        async function init() {
+            try {
+                // Fetch current user from API to ensure we have the correct ID associated with the token
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const userRes = await fetch('/api/current-user/', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (userRes.ok) {
+                        const userData = await userRes.json();
+                        currentUserId = userData.data.id;
+                        userRole = userData.data.roleKey;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch current user:", e);
+            }
+            
+            fetchOrders();
+        }
 
         async function fetchOrders() {
             try {
@@ -73,15 +94,9 @@
                     // Check if deleted
                     if (deletedOrders.includes(order.id)) return false;
 
-                    // Role based filtering
-                    // Note: Ensure API returns 'sender' (ID) or 'senderId' consistent with React logic
-                    // The Django model has 'sender' and 'receiver' as ForeignKeys (IDs), and 'senderName', 'receiverName'
-                    
-                    if (userRole === 'client' || userRole === 'guest_id') { // Assuming default is client-like
-                        return order.sender === currentUserId; 
-                    } else {
-                        return order.receiver === currentUserId;
-                    }
+                    // Show order if I am the sender OR the receiver
+                    // This handles clients seeing their requests, and drivers seeing their jobs
+                    return order.sender === currentUserId || order.receiver === currentUserId;
                 });
 
                 renderOrders(filteredOrders);
@@ -115,11 +130,20 @@
                 const card = document.createElement('div');
                 card.className = "p-4 bg-gray-800 rounded shadow-lg transition hover:bg-gray-750";
                 
+                // Status Logic
+                let riderDisplay = order.receiverName;
+                let statusColor = "text-gray-300";
+                
+                if (!riderDisplay) {
+                    riderDisplay = "No driver available";
+                    statusColor = "text-yellow-500 font-bold";
+                }
+
                 card.innerHTML = `
                     <p class="text-sm text-gray-300"><span class="font-bold">Customer:</span> ${order.senderName}</p>
                     <p class="text-sm text-gray-300"><span class="font-bold">Pickup:</span> ${order.origin}</p>
                     <p class="text-sm text-gray-300"><span class="font-bold">Destination:</span> ${order.destination}</p>
-                    <p class="text-sm text-gray-300"><span class="font-bold">Rider:</span> ${order.receiverName || 'Pending'}</p>
+                    <p class="text-sm ${statusColor}"><span class="font-bold text-gray-300">Rider:</span> ${riderDisplay}</p>
                     <button 
                         onclick="handleDelete('${order.id}')" 
                         class="mt-2 text-red-500 hover:underline hover:text-red-400 transition"
@@ -143,7 +167,7 @@
         }
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', fetchOrders);
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>

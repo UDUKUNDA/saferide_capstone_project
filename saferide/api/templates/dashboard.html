@@ -153,7 +153,7 @@
         let currentLocation = null; // { lat, lng }
         let currentAddress = '';
         let travelMode = 'DRIVING'; // 'DRIVING' or 'TWO_WHEELER'
-        let mapusers = []; // Mock data for now
+        let mapusers = []; 
         let currentUser = { 
             _id: "{{ user.id|default:'guest_id' }}", 
             username: "{{ user.username|default:'Guest' }}" 
@@ -173,13 +173,6 @@
                 return { emit: () => {} };
             }
         })();
-
-        // Mock Drivers Data (simulating mapusers from useChat)
-        const mockDrivers = [
-            { _id: 'd1', username: 'Jean Claude', roleKey: 'cabRider', latitude: -1.9441, longitude: 30.0619, car: "Toyota Corolla" },
-            { _id: 'd2', username: 'Marie Claire', roleKey: 'cabRider', latitude: -1.9500, longitude: 30.0580, car: "Rav4" },
-            { _id: 'd3', username: 'Emmanuel', roleKey: 'motorcyclist', latitude: -1.9350, longitude: 30.0800, car: "Moto 123" }
-        ];
 
         // --- Initialization ---
         function initMap() {
@@ -204,10 +197,8 @@
             // Start Geolocation logic
             getCurrentLocation();
 
-            // Simulate fetching users
-            mapusers = mockDrivers;
-            updateDriversOnMap();
-            renderDriversList();
+            // Fetch real drivers from API
+            fetchDrivers();
         }
 
         // Expose initMap to global scope for Google Maps API callback
@@ -410,6 +401,31 @@
             });
         }
 
+        async function fetchDrivers() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+
+                const res = await fetch('/api/users/', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    const users = await res.json();
+                    // Filter out current user and map id to _id
+                    mapusers = users.map(u => ({
+                        ...u,
+                        _id: u.id 
+                    })).filter(u => u.id !== currentUser._id);
+                    
+                    updateDriversOnMap();
+                    renderDriversList();
+                }
+            } catch (e) {
+                console.error("Failed to fetch drivers:", e);
+            }
+        }
+
         async function createOrderIfPossible(origin, destination) {
             const btnLoader = document.getElementById("btn-loader");
             const btnText = document.getElementById("btn-text");
@@ -417,55 +433,64 @@
             if (currentUser && currentLocation) {
                 const nearestUser = findNearestUser();
 
-                if (nearestUser) {
-                    const orderData = {
-                        senderId: currentUser._id,
-                        senderName: currentUser.username,
-                        origin,
-                        destination,
-                        receiverId: nearestUser._id,
-                        receiverName: nearestUser.username
-                    };
+                const orderData = {
+                    sender: currentUser._id,
+                    senderName: currentUser.username,
+                    origin,
+                    destination,
+                    receiver: nearestUser ? nearestUser._id : null,
+                    receiverName: nearestUser ? nearestUser.username : null
+                };
+                
+                const token = localStorage.getItem('token');
 
-                    try {
-                        // Mocking API Call
-                        console.log("Creating order with data:", orderData);
-                        await mockCreateOrderApi(orderData);
-                        
-                        socket.emit("sendOrder", orderData);
-                        
-                        // Success UI
-                        const successPopup = document.getElementById('success-popup');
-                        successPopup.classList.remove('hidden');
-                        
-                        setTimeout(() => {
-                            successPopup.classList.add('hidden');
-                            // navigate('/chat') equivalent
-                            window.location.href = "/dashboard"; // Or chat page if it existed
-                        }, 3000);
+                try {
+                    console.log("Creating order with data:", orderData);
+                    
+                    const response = await fetch('/api/orders/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(orderData)
+                    });
 
-                    } catch (error) {
-                        console.error('Error creating order:', error);
-                        document.getElementById("error-message").innerText = "Failed to create order.";
-                        document.getElementById("error-message").classList.remove("hidden");
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.detail || JSON.stringify(errData));
                     }
-                } else {
-                    console.error('No nearest user found');
+                    
+                    const createdOrder = await response.json();
+                    
+                    socket.emit("sendOrder", createdOrder);
+                    
+                    // Success UI
+                    const successPopup = document.getElementById('success-popup');
+                    if (!nearestUser) {
+                        successPopup.innerText = "Order Created! Waiting for a driver...";
+                        successPopup.classList.replace('bg-green-500', 'bg-yellow-500'); // Orange/Yellow for pending
+                    } else {
+                        successPopup.innerText = "Ride Ordered Successfully! Redirecting...";
+                        successPopup.classList.replace('bg-yellow-500', 'bg-green-500');
+                    }
+                    successPopup.classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        successPopup.classList.add('hidden');
+                        window.location.href = "/orders"; 
+                    }, 2000);
+
+                } catch (error) {
+                    console.error('Error creating order:', error);
+                    document.getElementById("error-message").innerText = "Failed to create order: " + error.message;
+                    document.getElementById("error-message").classList.remove("hidden");
                 }
             }
             
             // Reset button
             btnLoader.classList.add("hidden");
             btnText.innerText = "Find Ride";
-        }
-
-        // Mock API function
-        function mockCreateOrderApi(data) {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    resolve({ success: true, message: "Order created", data });
-                }, 1000);
-            });
         }
 
         // --- Map Visualization Helpers ---

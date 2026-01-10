@@ -69,7 +69,7 @@ class Message(models.Model):
 class Order(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_orders')
-    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_orders')
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_orders', null=True, blank=True)
     senderName = models.CharField(max_length=255)
     receiverName = models.CharField(max_length=255, blank=True, null=True)
     origin = models.CharField(max_length=255)
