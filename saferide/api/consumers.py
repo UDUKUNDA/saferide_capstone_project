@@ -2,11 +2,24 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import User
+from google.cloud import translate_v2 as translate
+import os
+import asyncio
 
 class ChatConsumer(AsyncWebsocketConsumer):
     # Track online users globally (in memory for now, use Redis for production scaling)
     # Dictionary format: { user_id: { id, username, roleKey, latitude, longitude, ... } }
     online_users = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Initialize Google Translate Client
+        # Credentials are automatically loaded from GOOGLE_APPLICATION_CREDENTIALS env var
+        try:
+            self.translate_client = translate.Client()
+        except Exception as e:
+            print(f"Warning: Google Translate Client failed to initialize: {e}")
+            self.translate_client = None
 
     @database_sync_to_async
     def get_user_details(self, user_id):
@@ -48,6 +61,43 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.broadcast_online_users()
                 print(f"User {self.user_id} removed from online list. Total: {len(ChatConsumer.online_users)}")
 
+    async def perform_translation(self, text):
+        if not self.translate_client:
+            return None
+
+        def _translate():
+            try:
+                # Detect language
+                detection = self.translate_client.detect_language(text)
+                source_lang = detection['language']
+                
+                translations = {}
+                
+                # If source is English, translate to Kinyarwanda
+                if source_lang == 'en':
+                    res = self.translate_client.translate(text, target_language='rw')
+                    translations['rw'] = res['translatedText']
+                # If source is Kinyarwanda, translate to English
+                elif source_lang == 'rw':
+                    res = self.translate_client.translate(text, target_language='en')
+                    translations['en'] = res['translatedText']
+                # If neither (or unknown), provide both English and Kinyarwanda (if different)
+                else:
+                    res_en = self.translate_client.translate(text, target_language='en')
+                    translations['en'] = res_en['translatedText']
+                    
+                    # Optional: Also translate to Kinyarwanda for complete coverage
+                    res_rw = self.translate_client.translate(text, target_language='rw')
+                    translations['rw'] = res_rw['translatedText']
+                
+                return translations
+            except Exception as e:
+                print(f"Translation error: {e}")
+                return None
+
+        # Run blocking translation in a separate thread to avoid blocking the async event loop
+        return await asyncio.to_thread(_translate)
+
     async def receive(self, text_data):
         data = json.loads(text_data)
         msg_type = data.get('type') or data.get('action') # handle both for flexibility
@@ -79,13 +129,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Expected data: { senderId, recipientId, text }
             recipient_id = data.get('recipientId')
             if recipient_id:
+                # Perform translation
+                text = data.get('text', '')
+                translations = await self.perform_translation(text)
+                
+                message_payload = {
+                    'type': 'chat_message',
+                    'message': data
+                }
+                
+                if translations:
+                    message_payload['message']['translations'] = translations
+
                 # Send to recipient's group
                 await self.channel_layer.group_send(
                     f"user_{recipient_id}",
-                    {
-                        'type': 'chat_message',
-                        'message': data
-                    }
+                    message_payload
                 )
                 # Also send back to sender for confirmation/display (optional if frontend handles it)
                 # But Socket.IO implementation didn't echo back to sender via socket, usually
